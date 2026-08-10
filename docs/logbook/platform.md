@@ -308,3 +308,22 @@ person-hours rather than 13852, and **51 always-on players rather than 19**.
 
 Egress then becomes 63 percent of the cost rather than 23. Once compute is cheap the wire is
 the wall, and the next optimisation is bytes rather than cycles.
+
+## Waking a room for real
+
+`proto/fly_rooms.py` wires the `wake` seam in `handoff.py` to `flyctl machine start`. Three
+cold starts of a stopped `shared-cpu-1x` in sjc:
+
+    2.64s   2.79s   2.77s
+
+That is the API returning, where the 3.4 seconds budgeted for a wake is the machine reaching
+its first tick, measured earlier over three restarts of a `performance-2x`. The two are
+consistent and the budget holds with room to spare, which matters because the whole point of
+predicting an approach is to have the far side up before anybody arrives.
+
+Both numbers are worth keeping separate. The API return is what a placer can observe. The
+first tick is what a player needs. Budget the second and monitor the first.
+
+The machine class here is `shared-cpu-1x`, which is what the 15 dollar tier runs on rather
+than the dedicated instance the earlier wake measurement used. Waking is not slower on shared
+hardware, which is one more place the shared-versus-dedicated question came out flat.

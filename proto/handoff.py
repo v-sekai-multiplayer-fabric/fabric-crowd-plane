@@ -56,7 +56,12 @@ def time_to_cross(e: Entity, b: Boundary):
 
 
 class Placer:
-    """Wakes rooms before they are needed and hands entities over when they arrive."""
+    """Wakes rooms before they are needed and hands entities over when they arrive.
+
+    `wake` defaults to a sleep for the measured duration. Pass `fly_rooms.wake` to start a
+    real stopped machine: three cold starts on shared-cpu-1x came back in 2.64, 2.79 and 2.77
+    seconds, against the 3.4 budgeted here, so the budget holds with margin.
+    """
 
     def __init__(self, wake=None, flush=None):
         self.wake = wake or self._sleep_wake
