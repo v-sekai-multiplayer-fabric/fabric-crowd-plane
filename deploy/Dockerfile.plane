@@ -1,0 +1,30 @@
+# The crowd plane: native C++, no Python, no renderer, no transport.
+#
+# MuJoCo comes from its own release rather than from the Python wheel, so the image carries a
+# C library and headers and nothing else.
+FROM debian:bookworm-slim AS build
+ARG MUJOCO_VERSION=3.2.7
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential cmake ca-certificates curl && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+RUN curl -fsSL -o mj.tar.gz \
+      "https://github.com/google-deepmind/mujoco/releases/download/${MUJOCO_VERSION}/mujoco-${MUJOCO_VERSION}-linux-x86_64.tar.gz" \
+ && mkdir -p /opt/mujoco && tar -xzf mj.tar.gz -C /opt/mujoco --strip-components=1
+COPY CMakeLists.txt ./
+COPY include ./include
+COPY src ./src
+COPY test ./test
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMUJOCO_ROOT=/opt/mujoco \
+ && cmake --build build -j \
+ && ./build/tick_test
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=build /opt/mujoco/lib/libmujoco.so* /usr/local/lib/
+COPY --from=build /src/build/weft-crowd-plane /usr/local/bin/
+COPY assets /room/assets
+RUN ldconfig
+WORKDIR /room
+ENV CROWD_BODIES=40 CROWD_SECONDS=0
+CMD ["/usr/local/bin/weft-crowd-plane", "assets/tracked_avatar.xml"]

@@ -1,0 +1,16 @@
+# The native crowd plane. A plane has no networking, so this app has no services: it runs,
+# simulates, and is reached over the bus by an edge. It is deployed on its own so the
+# measurement is of the plane and nothing else.
+app = "weft-plane"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "deploy/Dockerfile.plane"
+
+[env]
+  CROWD_BODIES = "40"
+  CROWD_SECONDS = "0"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

@@ -29,7 +29,10 @@ def venue(n, spacing=0.75, iters=10, islands=True):
         acts.append(re.sub(r'joint="([a-z_]+)"',
                            lambda m: 'joint="%s_%d"' % (m.group(1), i), ACT))
     flag = '<flag island="enable"/>' if islands else ''
+    # The offscreen framebuffer defaults to 640x480, so a renderer asking for more fails.
+    # It is a property of the model, not of the renderer, which is easy to miss.
     return ('<mujoco model="venue"><compiler angle="radian"/>'
+            '<visual><global offwidth="1920" offheight="1080"/></visual>'
             '<option timestep="0.016666" solver="Newton" iterations="%d">%s</option>'
             '<default><geom type="capsule" condim="3" friction="0.9 0.005 0.0001" density="985"/>'
             '<joint type="hinge" damping="2" armature="0.02"/>'

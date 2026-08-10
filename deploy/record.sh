@@ -51,11 +51,18 @@ FONT=$(find /usr/share/fonts -name "*.ttf" 2>/dev/null \
   | grep -viE "italic|oblique" | head -1)
 [ -n "$FONT" ] && FONTOPT="fontfile=${FONT}:" || FONTOPT=""
 
-# --- pass 1: lossless capture ------------------------------------------------
-echo "capturing ${SECS}s from ${DISP} at ${SIZE}$([ "$VERTICAL" = 1 ] && echo ", vertical 9:16 out")"
-ffmpeg -y -loglevel error \
-  -f x11grab -framerate 30 -video_size "$SIZE" -i "$DISP" \
-  -t "$SECS" -c:v ffv1 -level 3 -pix_fmt bgr0 "$WORK/raw.mkv"
+# --- pass 1: render, do not capture ------------------------------------------
+# An earlier version grabbed the X root with x11grab and produced 36 kB of black: this is a
+# Wayland session, so there is nothing on the X root to grab. Screen capture was the wrong
+# tool regardless. MuJoCo renders offscreen through EGL with no display, no browser and no
+# compositor, at whatever resolution is asked for.
+if [ -n "${RAW:-}" ]; then
+  echo "using prerendered $RAW"
+  cp "$RAW" "$WORK/raw.mkv"
+else
+  echo "rendering ${SECS}s offscreen"
+  MUJOCO_GL=egl SECS="$SECS" "${PYTHON:-python3}" "$(dirname "$0")/render.py" "$WORK/raw.mkv"
+fi
 
 # --- pass 2: title, then encode ---------------------------------------------
 echo "encoding with title and metadata"

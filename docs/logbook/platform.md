@@ -443,3 +443,54 @@ Recordings are in `~/weft-videos` as MKV, AV1 because Fedora ships ffmpeg withou
 captured losslessly first and encoded second so a slow encoder cannot drop frames of the thing
 being recorded. Title burned in, `CITATION.cff` metadata in the container, 30 seconds, with a
 9:16 crop for a feed. They are artefacts and not committed, per `CLAUDE.md`.
+
+## The standard plane: native C++, deployed
+
+`src/plane.cpp`, `include/crowd/`, built with CMake against MuJoCo's C API. A plane is a
+native process outside the BEAM, and `plane.py` was a stand-in for one.
+
+Local, 40 bodies:
+
+    [plane] 600 ticks in 10.00s (60.0 Hz), 200 frames, 1040 packets each
+    [plane] worst step 3038 us, worst encode 22 us, dropped 0 steps
+
+Deployed on a `shared-cpu-1x` in sjc:
+
+    [plane] 30s  60.0 Hz  40 bodies  1040 packets a frame  worst step 6023 us, worst encode 41 us, dropped 0
+    [plane] 50s  60.0 Hz  40 bodies  1040 packets a frame  worst step 5319 us, worst encode 25 us, dropped 0
+
+Encoding, which is the part that was pathological in Python:
+
+| | us for a frame of 1040 packets |
+| --- | --- |
+| Python, packet at a time | 7956 |
+| Python, numpy structured dtype | 88 |
+| **C++, plain struct** | **22** |
+
+The packet is a `#pragma pack` struct with `static_assert` on every offset, so the layout is
+checked at compile time against the Lean spec rather than at test time.
+
+`include/crowd/tick.hpp` holds the loop arithmetic apart from the loop, and `test/tick_test.cpp`
+checks it: the cap is `latencyTicks` from the Lean resources spec and not a chosen number, a
+long stall is capped instead of becoming thousands of steps, the debt is dropped rather than
+chased, and `rest()` is never negative. That last one is the bug that starved the event loop
+in the Python plane, now something a test would catch.
+
+The image builds MuJoCo from its own release rather than the Python wheel, so it carries a C
+library and no interpreter. `tick_test` runs during the build, so an image cannot be produced
+with the tick arithmetic broken.
+
+## The videos were black, and screen capture was the wrong tool
+
+The first recordings were 34 kB of nothing. `x11grab` was grabbing the X root of a Wayland
+session, where there is nothing to grab.
+
+`deploy/render.py` renders offscreen through MuJoCo's EGL path instead: no display, no
+browser, no compositor. It also needs `<visual><global offwidth=... offheight=.../></visual>`
+in the model, because the offscreen framebuffer defaults to 640x480 and is a property of the
+model rather than of the renderer.
+
+Recordings are two-pass: lossless FFV1 first, then AV1 with the title burned in and the
+`CITATION.cff` metadata in the container. Capture and encode are separate jobs, and a slow
+encoder must not drop frames of the thing being recorded. 30 seconds, with a 9:16 cut.
+They are artefacts and are not committed.
