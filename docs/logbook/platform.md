@@ -327,3 +327,37 @@ first tick is what a player needs. Budget the second and monitor the first.
 The machine class here is `shared-cpu-1x`, which is what the 15 dollar tier runs on rather
 than the dedicated instance the earlier wake measurement used. Waking is not slower on shared
 hardware, which is one more place the shared-versus-dedicated question came out flat.
+
+## Deployed: a room on Fly, a client here, a browser drawing it
+
+`deploy/Dockerfile` and `deploy/fly.toml`. One `shared-cpu-1x` with 1 GB in sjc, running
+`proto/plane.py` and nothing else. `auto_stop_machines` is on and `min_machines_running` is
+zero, so an empty room bills nothing.
+
+    [plane] 40 bodies simulating, publishing on :8770
+    [plane] 80s  1 clients  136 person-to-person contacts  13.84 kB/s each
+
+The client ran on a laptop, connected over WSS to the public internet, and drew the crowd in a
+browser from localhost. The datacenter simulates and the player's machine renders, which is
+the split the prototype README argues for and this is the first time it crossed a real
+network.
+
+### The wire got better with more bodies
+
+13.84 kB a second for 40 bodies at 20 Hz is **17 bytes for a body for a frame**, against 22
+measured as an entropy floor and 25 measured locally with 12 bodies.
+
+Below the floor is not a contradiction: the floor was per-body entropy measured
+independently, and this is a whole frame compressed together. Forty bodies in one frame share
+structure that twelve do not — the same header fields, the same delta shapes, muscles moving
+through the same ranges — and zstd finds it across bodies as well as across time.
+
+So the wire improves with crowd size, which is the opposite of the usual direction and worth
+knowing before sizing anything from the small measurements in `wire.md`.
+
+### What that does to the numbers
+
+At 17 bytes and the 139 people a core measured earlier, 15 dollars buys about 207 always-on
+players rather than 72. That is an extrapolation from two measurements taken separately, and it
+should be believed only as far as the smaller of them: the capacity figure came from a driven
+avatar with no controller, and a real crowd will differ.
