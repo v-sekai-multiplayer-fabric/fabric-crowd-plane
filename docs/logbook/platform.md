@@ -252,3 +252,40 @@ describes for the packaged release.
 
 The three-node cluster is not deleted. It is what a deployment buys when downtime starts
 costing more than 314 dollars a month, and that is a threshold rather than an architecture.
+
+## Shared vCPU holds 60 Hz, and the earlier conclusion was wrong
+
+`bench/fly/tick_loop.py`, `shared-cpu-2x` with 2 GB in `sjc`, 60 bodies, 36000 ticks.
+
+| | shared, 60 bodies | dedicated, 301 bodies |
+| --- | --- | --- |
+| work p50 | 3679 us, 22 percent of tick | 16525 us, 99 percent |
+| work p99 | 5171 | 20723 |
+| work max | 22918 | 45505 |
+| **tick lateness p99** | **283 us** | 236931 |
+| **missed ticks** | **1 of 36000** | 13150 |
+
+One missed tick in ten minutes, on the machine class this logbook said could not hold a
+deadline. The p99 lateness is 283 microseconds against 237 milliseconds on a dedicated core.
+
+**The 237 milliseconds was load, not tenancy.** The earlier entry attributed it to the
+hypervisor taking the core away, and then a cost model was built on the idea that a real-time
+deadline requires dedicated cores at eight times the price. The dedicated machine was running
+at 99 percent of its tick. This one is running at 22. Nothing about the machine class was
+being measured; headroom was.
+
+The comparison is not yet clean, because the two runs differ in load as well as in class. A
+dedicated run at 60 bodies is in flight and separates them.
+
+### What it costs if it holds
+
+`shared-cpu-2x` with 2 GB is 14.90 dollars a month against 83.36 for `performance-2x`, which
+is 5.6 times. Spread over 139 people a core it moves the machine from 0.000822 dollars for
+each person-hour to 0.000147.
+
+It does not move the bill by 5.6 times, because egress does not change. At the lean wire the
+total goes from 0.001072 to 0.000397 for each person-hour, so 15 dollars buys 37368
+person-hours rather than 13852, and **51 always-on players rather than 19**.
+
+Egress then becomes 63 percent of the cost rather than 23. Once compute is cheap the wire is
+the wall, and the next optimisation is bytes rather than cycles.
