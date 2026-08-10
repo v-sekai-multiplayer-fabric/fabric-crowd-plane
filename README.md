@@ -3,7 +3,7 @@
 A thousand people in one venue. Simulated at 60 Hz, published at 20 Hz, with one entity for
 each joint.
 
-State: the budget is proved and nothing is built. Read the gate below before writing code.
+State: the budget is proved but nothing is built.
 
 ## Why this exists
 
