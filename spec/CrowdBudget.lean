@@ -181,6 +181,77 @@ theorem the_single_body_figure_overpromises :
     the biomechanics layer stops being the crowd and becomes a sample of it. -/
 theorem one_body_at_the_whole_tick : bodiesPerPlane biomechUs = 1 := by native_decide
 
+/- ## Posing beats simulating, when the pose is measured
+
+   Forward dynamics answers "where does this body go". Tracking already answers it. Six
+   trackers report head, two hands, waist, and two feet, and those six transforms determine
+   the pose, so the limbs between them are solved rather than simulated.
+
+   Each limb is a two-bone chain with one hinge, and a two-bone chain has a closed form. The
+   law of cosines gives the elbow or knee angle and a swivel constant picks which way it
+   points, which is the one thing tracking does not report. `bench/bench_pose.cpp` is the
+   whole solver and it is about sixty lines. -/
+
+/-- MEASURED. `bench/bench_pose.cpp`, a thousand tracked bodies on one core, every tracker
+    moving every frame. 102 microseconds for the venue, 0.102 for each body.
+
+    A general numerical solver is not an alternative. Damped least squares over six body
+    jacobians, three iterations, costs 148 microseconds for ONE body: 1450 times the
+    analytic cost, and 11 planes for the crowd instead of a fraction of one. The closed form
+    is not an optimisation of the numerical route. It is a different route. -/
+def poseVenueUs : Nat := 102
+
+/-- Everything one venue costs on one core, at 60 Hz, with a thousand tracked people. -/
+def venueUs : Nat := publishUs + steerUs + contactUs + poseVenueUs
+
+theorem venue_costs_2860 : venueUs = 2860 := by native_decide
+
+/-- THE ANSWER TO BOTH QUESTIONS. One core carries the whole venue, at 17 percent of a tick.
+
+    The fleet is one core rather than thirty-two, so the cost for each head falls by the same
+    factor. -/
+theorem a_venue_fits_one_core : venueUs < tickUs := by native_decide
+
+theorem a_venue_uses_a_sixth_of_a_core : venueUs * 100 / tickUs = 17 := by native_decide
+
+/-- Cost for each head each month, in tenths of a cent. Tenths and not cents, because the
+    answer is 3.8 cents and rounding it to a whole cent loses a fifth of it.
+
+    The core-month price is the one weft already pays: thirty-two cores carrying a thousand
+    people came to 122 cents for each head, which puts a core-month at 3812 cents. -/
+def coreMonthCents : Nat := 3812
+def tenthCentsPerHead (cores : Nat) : Nat := coreMonthCents * 10 * cores / people
+
+/-- 121.9 cents, the musculoskeletal answer. -/
+theorem musculoskeletal_costs_122_cents : tenthCentsPerHead 32 = 1219 := by native_decide
+
+/-- 3.8 cents, the tracked answer, under the four-cent target. -/
+theorem tracked_costs_under_four_cents : tenthCentsPerHead 1 = 38 := by native_decide
+theorem tracked_is_under_the_target : tenthCentsPerHead 1 < 40 := by native_decide
+
+/-- Thirty-two times cheaper, and the reason is not a faster body. It is a body that stopped
+    computing what a tracker already reports. -/
+theorem the_fleet_shrank_thirtyfold :
+    tenthCentsPerHead 32 / tenthCentsPerHead 1 = 32 := by native_decide
+
+/- ## What the leftover tick buys
+
+   Posing the venue leaves most of the tick unspent, and forward dynamics is still there for
+   whoever needs it. A body nobody is wearing has no tracker to pose it from, so an
+   unattended body is simulated rather than posed. -/
+
+def headroomUs : Nat := tickUs - venueUs
+
+/-- MEASURED. One tracked-avatar body under full forward dynamics, one step for each frame
+    at a 16.7 millisecond timestep, in a batch of 28. -/
+def dynamicBodyFrameUs : Nat := 29
+
+def dynamicBodiesInHeadroom : Nat := headroomUs / dynamicBodyFrameUs
+
+/-- The same core that poses a thousand tracked people also simulates 476 unattended bodies
+    outright. A venue does not have to choose between the two. -/
+theorem headroom_carries_476_simulated : dynamicBodiesInHeadroom = 476 := by native_decide
+
 /- ## The levers that are spent
 
    A constant this file cannot lower is worth recording, because the next reader will
