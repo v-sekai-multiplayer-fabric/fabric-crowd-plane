@@ -893,7 +893,57 @@ theorem muscles_beat_rotations : rotationPackedBytes * 10 / musclePackedBytes = 
    that wins is stateless for each frame, so it rides sequenced unreliable WebTransport and a
    dropped datagram costs one frame rather than desynchronising a decoder. -/
 
-/-- The design number: delta, then an order-0 range coder over the muscle symbols. 53 bytes
+/- ### Correcting the floor, and what a learned model would need
+
+   The 53 byte figure was measured on synthetic gait where every muscle is an independent
+   sinusoid. Real motion is not independent. A knee and a hip move together because a leg is
+   attached to a body and both are under gravity, and that coupling is redundancy a coder
+   takes for free.
+
+   MEASURED. `bench/wire_learned.py` drives the tracked avatar in MuJoCo under gravity and
+   contact and records what the joints actually do, in the avatar's own 26 degree of freedom
+   joint space:
+
+     order-0 entropy of deltas         26 bytes
+     order-1, context on own history   21 bytes
+
+   So coupling is worth half, and the synthetic number was pessimistic. It is not a like for
+   like swap, because 26 driven joints is not 49 muscles, and the honest statement is the
+   direction rather than the ratio: physically coupled motion compresses about twice as well
+   as motion assembled from independent sinusoids.
+
+   Order-1 context modelling is worth a further fifth. It conditions each joint on the size
+   and sign of its own previous delta, it needs no training, it is integer arithmetic, and it
+   is identical on every machine. That is the coder to write.
+
+   ### Why the learned question cannot be answered yet
+
+   PCA on the same recording needs 25 of 26 components for 99 percent of the variance, and at
+   24 components the worst joint is still 71 degrees out. That looks like a verdict on PCA
+   and it is not. The recording is a ragdoll driven by random sinusoidal torques: physically
+   real, behaviourally meaningless. Coordinated human motion is famously low rank and a
+   flailing one is not, so the pose manifold that PCA and a learned model both exploit is
+   simply absent from this data.
+
+   Which means the honest answer to whether a learned codec pays is that it cannot be
+   measured here. It needs recorded human motion, from a capture set or from live trackers,
+   and the crowd plane does not produce it yet. Both PCA and a small network would do far
+   better on coordinated motion than on this, and by how much is exactly the unknown.
+
+   Two costs to weigh when that data exists. A trained model is the largest tuning constant
+   a system can have, fitted to a workload, and weft's rule against tuning constants exists
+   because a constant is a guess about a workload nobody has measured. And an encoder and a
+   decoder must agree bit for bit, so a float network across client platforms is a
+   correctness hazard rather than a compression question. Integer quantised inference fixes
+   the second and not the first. -/
+
+/-- MEASURED on real simulated motion, order-1 context coding. The design number. -/
+def contextCodedBytes : Nat := 21
+
+theorem context_coding_beats_order_zero :
+    (26 - contextCodedBytes) * 100 / 26 = 19 := by native_decide
+
+/-- The design number for synthetic muscle data: delta, then an order-0 range coder over the muscle symbols. 53 bytes
     plus a root position. zstd instead of a range coder gives 69 today and needs no new
     code, and no dictionary scheme beats it. -/
 def muscleEntropyBytes : Nat := 53
