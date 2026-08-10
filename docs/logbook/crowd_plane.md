@@ -223,3 +223,30 @@ worse of the two until a wider sample exists.
 That also puts a floor under how much of this can be answered by benchmarking at all. A
 plane that must hold 60 Hz on a machine it cannot choose has to degrade rather than assume,
 which is an admission-control question and not a physics one.
+
+## Sizing against a machine nobody chose
+
+Two samples are a range, not a bound. Extending the table above to a machine 20 percent
+worse than the worse of the two, which nothing observed rules out:
+
+| p90 of the body | crowd vCPU for 1000 | venue vCPU |
+| --- | --- | --- |
+| 31.4 us, the desk | 3 | 6 |
+| 52.6 us, the good machine | 4 | 7 |
+| 65.7 us, the bad machine | 5 | 8 |
+| 80.0 us, unobserved | 6 | 9 |
+
+The platform sells eight. A touchable thousand fits the good machine with a core spare,
+fits the bad machine with none, and does not fit a machine slightly worse than one already
+seen.
+
+No constant makes that safe, because the quantity it would bound is not bounded. So the
+constant goes, and admission triggers on a ratio instead: the work a tick took over the
+tick period, both measured on the machine that is running. Admit while the rolling p99 of
+that ratio stays under one. A tick longer than a tick is a missed frame, so the threshold
+is one by definition rather than by choice, and a slow machine admits fewer people without
+anybody deciding it should.
+
+What it costs is the promise. A venue cannot advertise a size it will always hold. It can
+advertise what it holds on the worst machine it will keep, and give back the rest as
+headroom. That is weaker than a fixed capacity and it is the true one.

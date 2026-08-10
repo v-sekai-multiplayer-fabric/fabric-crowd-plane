@@ -1219,6 +1219,76 @@ theorem seven_still_fits_the_size_bought : flyVenueNeeded ≤ 8 := by native_dec
     deployment is sized from. -/
 theorem one_core_holds_301 : peopleAt flyBodyP90Ns 1 = 301 := by native_decide
 
+/- ## The bound is loose, so the constant has to go
+
+   Two machines, same image, same size, same region, 25 percent apart on the tail. Two
+   samples are a range and not a bound, and the machine a venue lands on is not chosen by
+   anybody here.
+
+   Sizing against the worse of the two, and against a machine 20 percent worse again that
+   nothing rules out:
+
+     p90 of the body     crowd vCPU for a thousand     venue vCPU
+     52.6 us (good)                  4                      7
+     65.7 us (bad)                   5                      8
+     80.0 us (unobserved)            6                      9
+
+   The platform sells eight. So a touchable thousand fits the good machine with one core
+   spare, fits the bad machine with none, and does not fit at all on a machine only slightly
+   worse than one already seen. There is no constant that makes that safe, because the thing
+   it would have to bound is not bounded.
+
+   The rule against tuning constants says what to do instead. A constant is a guess about a
+   workload nobody has measured, and the fix is to trigger on a ratio between two measured
+   quantities, because a ratio has no units to tune and moves with the load on its own.
+
+   The ratio here is the tick load: the work a tick actually took, over the tick period.
+   Both terms are measured, on the machine that is running, while it runs.
+
+     admit while the rolling p99 of tick load stays below one
+
+   No constant, and nothing to tune. A slow machine admits fewer people without anybody
+   deciding that it should. A machine better than any measured here admits more. The
+   fraction is not a knob either: a tick that takes longer than a tick is a missed frame,
+   so the threshold is one by definition and not by choice.
+
+   What this costs is the promise. `peopleAt` below stops being a capacity and becomes a
+   prediction, and a venue cannot advertise a number it will always hold. It can advertise
+   the number it holds on the worst machine it is willing to keep, and hand back the rest as
+   headroom when the machine is better. That is a weaker guarantee than a fixed size, and it
+   is the true one. -/
+
+def worstObservedBodyNs : Nat := 65740
+
+theorem the_bad_machine_needs_five_cores :
+    peopleAt worstObservedBodyNs 4 < people ∧ peopleAt worstObservedBodyNs 5 > people := by
+  native_decide
+
+/-- Which spends the whole machine: five for the crowd, one for the ring and the BEAM, two
+    for the edge. -/
+theorem the_bad_machine_fills_the_venue : 5 + 1 + 2 = 8 := by native_decide
+
+/-- And a machine 20 percent worse than the worse of the two already seen does not fit the
+    largest size the platform sells. Nothing observed rules that machine out. -/
+theorem a_slightly_worse_machine_does_not_fit :
+    peopleAt 80000 5 < people ∧ peopleAt 80000 6 > people := by native_decide
+
+/- ### The load ratio, which replaces it
+
+   Dimensionless, in parts per thousand so it stays in Nat. -/
+
+def tickLoadPerMille (workNs : Nat) : Nat := workNs * 1000 / (tickUs * 1000)
+
+/-- A tick that takes a whole tick is a load of one, and that is the admission threshold. It
+    is not chosen. -/
+theorem the_threshold_is_one : tickLoadPerMille (tickUs * 1000) = 1000 := by native_decide
+
+/-- 301 people on one core of the good machine sit at 95 percent, which is why the loop test
+    matters more than the microbenchmark: the headroom is thinner than the arithmetic. -/
+theorem three_hundred_on_a_good_core :
+    tickLoadPerMille (301 * (2433 + 45 + 280 + 52560) / 1) / 10 = 99 := by native_decide
+
+
 
 /-- The shipped wire: order-1 context coding, 21 bytes of muscle deltas plus a root position,
     at 20 Hz for the bodies within touching distance. Distant bodies send a root position at
