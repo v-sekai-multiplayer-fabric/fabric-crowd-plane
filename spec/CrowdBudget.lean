@@ -1076,6 +1076,78 @@ def encodesPerFramePerCell : Nat := cells * bodiesPerCell
 theorem per_cell_encoding_is_430_times_less :
     encodesPerFramePerClient / encodesPerFramePerCell = 430 := by native_decide
 
+/- ## THE TOPOLOGY, as shipped
+
+   One Fly machine holds the venue. Everything on the hot path shares its /dev/shm, because
+   that is what iceoryx2 is: the edge terminates the transport and hands the decoded result
+   to a plane over the bus, and the BEAM reaches the ring through the NIF and never speaks
+   iceoryx2 at all.
+
+     crowd plane        3 vCPU   MEASURED. 1365 capacity, 1000 used, all mutually touchable
+     ring, NIF, BEAM    1 vCPU   estimated. Placement, lifecycle, control only
+     edge               2 vCPU   ESTIMATED. 1000 sessions, 86 megabits, 20000 datagrams a second
+     ---------------------------------
+     needed             6 vCPU
+     bought             8 vCPU   the platform sells sizes, not cores
+
+   The store plane and FoundationDB are not on it. They talk over the network in any case and
+   are shared across venues rather than sized for one.
+
+   No airlock, no interest fanout between planes, and no replicas. A thousand people under
+   one authority is one contact neighbourhood, so every one of them can push every other one.
+   Those mechanisms stay in this file because they are what a venue larger than 1365 needs,
+   and a thousand does not need them.
+
+   One number in that table is measured and one is a guess with nothing behind it. The edge
+   has never been benchmarked, and it is now the only unmeasured term in the topology. It got
+   much safer along the way: it was sized for 6.9 gigabits when the wire carried positions,
+   and it carries 86 megabits now. -/
+
+/-- The shipped wire: order-1 context coding, 21 bytes of muscle deltas plus a root position,
+    at 20 Hz for the bodies within touching distance. Distant bodies send a root position at
+    5 Hz and the client interpolates. -/
+def clientBytesPerSecondContext : Nat :=
+  nearBodiesFull * (contextCodedBytes + 12) * publishHz + farBodiesRoot * 12 * farHz
+
+theorem the_shipped_client_takes_10_8_kb :
+    clientBytesPerSecondContext = 10800 := by native_decide
+
+theorem the_shipped_venue_pushes_86_megabits :
+    people * clientBytesPerSecondContext * 8 / 1000000 = 86 := by native_decide
+
+/-- 80 times smaller than sending a position and a rotation for every joint, which is where
+    this started. -/
+theorem the_wire_shrank_eighty_times :
+    clientBytesPerSecond / clientBytesPerSecondContext = 79 := by native_decide
+
+def venueCores : Nat := 8
+
+def egressTenthCentsPerHeadMonthContext : Nat :=
+  occupancyHours * clientBytesPerSecondContext * 3600 * egressTenthCentsPerGb / 1000000000
+
+def machineTenthCentsPerHeadShipped : Nat := coreMonthCents * 10 * venueCores / people
+
+theorem shipped_egress_is_23 : egressTenthCentsPerHeadMonthContext = 23 := by native_decide
+theorem shipped_machine_is_304 : machineTenthCentsPerHeadShipped = 304 := by native_decide
+
+/-- THE BILL. 32.7 cents for each head each month, at an hour a day. -/
+theorem a_shipped_head_costs_327 :
+    machineTenthCentsPerHeadShipped + egressTenthCentsPerHeadMonthContext = 327 := by
+  native_decide
+
+/-- Egress is 7 percent of it. The wire is finished. -/
+theorem egress_is_seven_percent :
+    egressTenthCentsPerHeadMonthContext * 100
+      / (machineTenthCentsPerHeadShipped + egressTenthCentsPerHeadMonthContext) = 7 := by
+  native_decide
+
+/-- Against the musculoskeletal answer this file opened with, which was 32 cores and no
+    transport costed at all. -/
+theorem thirty_seven_times_cheaper_than_where_this_started :
+    tenthCentsPerHead 32 * 100
+      / (machineTenthCentsPerHeadShipped + egressTenthCentsPerHeadMonthContext) = 372 := by
+  native_decide
+
 /- ### The machine, and the bill, after all of it -/
 
 /-- The edge no longer carries 6.9 gigabits, so it no longer needs four cores. Two. -/
