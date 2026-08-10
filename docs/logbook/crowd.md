@@ -307,3 +307,47 @@ can see it.
 The spec puts a causal vector clock on each replica, `RelReplica` with `VClock`, so staleness
 is causal rather than wall-clock. This implementation has no clock on a ghost at all. That is
 the next thing to read rather than to invent.
+
+## The thread closes: two rooms, one boundary, a player crossing
+
+`proto/two_rooms.py`. Two zones, each authoritative over its own half and each with its own
+contact solve. room-b starts stopped.
+
+    t= 1.32s x= 7.87m  WAKING    room-b (5.1s out, it is asleep)
+    t= 5.92s x=14.31m  GHOST     ada into room-b   (reach 0.7 m overlaps)
+    t= 6.42s x=15.01m  CROSSED   into room-b, waited 153 ms
+    t=10.40s x=20.58m  AUTHORITY ada -> room-b     (240 ticks inside)
+                                  room-a released it; exactly one holder, checked
+
+Four mechanisms in the right order, each built separately and none of them adjusted to make
+this run: the approach is predicted and the far room woken while the player walks, a ghost is
+registered when the kinematic expansion overlaps, the crossing costs a flush, and authority
+follows four seconds later once presence is continuous.
+
+**room-b was woken in 3.40 seconds, entirely while ada was still walking.** The player waited
+153 milliseconds, which is the flush.
+
+### A single-writer violation, and why it is worth writing down
+
+The first run ended with both rooms claiming the entity:
+
+    room-a[up] auth=['ada']    room-b[up] auth=['ada']
+
+The transfer read the old owner **after** `ist.step` had already reassigned it, so the release
+compared a room against itself, decided nothing needed releasing, and left two writers. Every
+line of output looked correct. The invariant is what caught it, and only because it was
+checked rather than assumed.
+
+That invariant is not a detail here. `Weft.Actor` rests on it: one process for each entity,
+mailbox ordering doing the serialisation, no leases and no fencing. Two writers means the
+serialisation is gone and nothing downstream notices until state diverges. So the assert stays
+in, at the moment of transfer and at the end of the run.
+
+### What is still standing in
+
+The rooms are processes rather than machines, and `wake` sleeps for the measured duration
+rather than calling `flyctl` — though `proto/fly_rooms.py` does call it, and three cold starts
+came back in 2.64, 2.79 and 2.77 seconds. The flush is a sleep, because the store it should
+call is the code deleted in #96.
+
+Neither of those is a question about whether the design works. They are wiring.

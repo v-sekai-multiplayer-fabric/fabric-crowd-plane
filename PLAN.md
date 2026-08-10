@@ -105,8 +105,8 @@ later layer cheat:
 | push each other | contact between articulated bodies | measured |
 | walk | the character controller | in training |
 | across a boundary | predictive pre-wake, no doorway | **built**, `proto/handoff.py` |
-| a different machine | placement, and a room that was stopped | not built |
-| that was asleep | scale to zero, which is what 15 dollars buys | measured, `bench/fly/room.py` |
+| a different machine | two zones, one boundary, single writer asserted | **built**, `proto/two_rooms.py` |
+| that was asleep | woken while they walked, 2.6 to 2.8 s real | **built**, `proto/fly_rooms.py` |
 | with their state | flush, then hand off | designed; the replicated store was deleted in #96 |
 | and keep pushing | the same contact solve on the far side | measured |
 
