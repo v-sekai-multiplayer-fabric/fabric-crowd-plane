@@ -214,3 +214,48 @@ durations. Wiring them means the control plane choosing a machine, Fly starting 
 
 So the doorway is real and what it opens onto is simulated. That is the honest state, and it
 is the right order: the timing budget is the part that could have been wrong, and it is not.
+
+## RETIRED AGAIN: no airlock. The wake was never on the critical path.
+
+The doorway built in the entry above is deleted. It existed to hide a 3.4 second machine wake
+behind a 5 second walk, and hiding it was the wrong idea: **the wake does not have to be on
+the critical path at all.**
+
+`lean-fabric-protocol/core/WaypointBound.lean` derives a migration budget from
+`maxTravelTicks = ceil(simDiameter / vMaxPhysical)`. An entity cannot move faster than
+vMaxPhysical, so there is always a bound on the earliest it can reach a boundary. A bound on
+arrival is a warning, and a warning is enough to start the machine early.
+
+`proto/handoff.py`, at a horizon of 1.5 times the wake:
+
+    walking at 1.4 m/s, 10 m from the boundary
+       2.59s  ada is 5.1s from the north wall, waking room-07
+       9.15s  ada crossed into room-07, waited 15 ms
+
+    running at 3.0 m/s, 10 m from the boundary
+       0.00s  ada is 3.3s from the north wall, waking room-07
+       4.39s  ada crossed into room-07, waited 15 ms
+
+**152 milliseconds at the seam**, which is the flush and nothing else. The runner is inside
+the horizon at the first tick; the walker enters it at 2.59 seconds. Both arrive at a room
+that is already running.
+
+### Why the horizon is affordable
+
+The worst case in `WaypointBound` is vMaxPhysical, which is 30 m/s at 60 Hz. Waking every room
+an entity could reach at 30 m/s would wake all of them, since 3.4 seconds at that speed is 102
+metres and a room is 30. But vMax is a **bound**, not a speed. Watching actual velocity puts
+the walker's horizon at 4.8 metres and the runner's at 10.2, which is a fraction of a room.
+
+So the hard bound guarantees correctness and the observed velocity makes it cheap, which is
+the shape of every good predictor.
+
+### What this deletes
+
+The airlock, for the second and final time. The first retirement was for a reason that was
+true and incomplete: the seam is where touch stops. It came back because migration is what
+makes scale-to-zero possible and scale-to-zero is what makes the price. Both of those still
+hold. What has changed is that the migration no longer needs hiding, so there is no mechanism
+left to build, only a prediction to run.
+
+A boundary is now just a boundary. Players walk across it.

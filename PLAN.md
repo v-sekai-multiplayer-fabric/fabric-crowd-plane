@@ -92,8 +92,9 @@ prototype-scale tick. It cannot prove the design.
 The prototype is one thin path that touches every layer, end to end, and it is not a demo of
 physics alone. It is:
 
-**Two people in a room push each other. One walks through a doorway. The room on the far side
-is a different machine that was asleep. They arrive with their state and keep pushing.**
+**Two people in a room push each other. One walks across a boundary. The room on the far side
+is a different machine that was asleep, and was woken while they were still walking. They
+arrive with their state, in 152 milliseconds, and keep pushing.**
 
 Every part of that sentence is a layer, and each is there because leaving it out would let a
 later layer cheat:
@@ -103,7 +104,7 @@ later layer cheat:
 | two people in a room | one MuJoCo model, one contact solve | measured, `bench/touchable.py` |
 | push each other | contact between articulated bodies | measured |
 | walk | the character controller | in training |
-| through a doorway | the airlock, hiding a 3.4 s wake | not built |
+| across a boundary | predictive pre-wake, no doorway | **built**, `proto/handoff.py` |
 | a different machine | placement, and a room that was stopped | not built |
 | that was asleep | scale to zero, which is what 15 dollars buys | measured, `bench/fly/room.py` |
 | with their state | flush, then hand off | designed; the replicated store was deleted in #96 |
@@ -154,7 +155,8 @@ Cross-machine interest fanout, and per-tick state between machines. A touchable 
 contact solve on one machine, so a venue larger than one machine cannot share the only
 feature worth selling.
 
-The **airlock stays**, for a reason its first design got wrong. It is not a way to make a
-venue bigger. It is the seam where the machine running you changes, which happens because
-rooms stop when empty and that is what makes the price. `docs/logbook/crowd.md` records the
-retirement and the reversal.
+The **airlock is gone**, for the second and final time. It existed to hide a 3.4 second
+machine wake, and the predictive bound in `lean-fabric-protocol` takes the wake off the
+critical path entirely: watch who is approaching, start the far side while they are still
+walking, hand over in the time a flush takes. A boundary is just a boundary.
+`docs/logbook/crowd.md` records the retirement, the reversal, and the second retirement.
