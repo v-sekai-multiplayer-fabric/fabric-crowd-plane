@@ -259,3 +259,51 @@ hold. What has changed is that the migration no longer needs hiding, so there is
 left to build, only a prediction to run.
 
 A boundary is now just a boundary. Players walk across it.
+
+## Interest management, from the spec
+
+`proto/interest.py`, against `lean-interest-mgmt/core/AuthorityInterest.lean` and the
+`ghostBound` formula proved in `lean-spatial-oracle/core/Formula.lean`.
+
+The spec separates two things this prototype had been running together.
+
+**Authority** is the zone advancing an entity's physics. Exactly one, always. **Interest** is
+a read-only ghost held by a neighbouring zone, and there can be many. The registration rule is
+not a radius: an entity enters a zone's interest when its k-tick kinematic expansion overlaps
+that zone, where the expansion is
+
+    ghostBound v a_half k = v*k + a_half*k*k
+
+with monotonicity in v, a and k proved, which is what makes it safe as a bound.
+
+    two 15 m zones, k = 30 ticks, hysteresis = 240 ticks
+    ghostBound at 1.4 m/s over 30 ticks =  0.70 m
+    the same at vMaxPhysical            = 15.0 m
+
+    t= 5.20s  x=14.30m  GHOST      ada -> zone-b   (reach 0.7 m overlaps zone-b)
+    t= 9.68s  x=20.58m  AUTHORITY  ada -> zone-b   (240 ticks inside)
+
+Ghosted 0.7 metres before the border. Authority moved 4.5 seconds later and 5.6 metres past
+it. Different questions, different answers, and an entity that brushes a boundary is ghosted
+at once and never migrates at all.
+
+### The same predictor, twice
+
+`handoff.py` took a machine wake off the critical path by predicting who was approaching a
+boundary. This registers a ghost by predicting the same thing. Both are `ghostBound`, and both
+work for the same reason: **vMaxPhysical guarantees correctness and observed velocity makes it
+cheap.** 0.70 metres against 15.0 is a factor of twenty, and the twenty is free because the
+bound is only needed when the estimate is wrong.
+
+### What it settles about the wire
+
+Every wire measurement in this book assumed four near bodies and seventy far ones, with
+nothing deciding which was which. This decides it, and it decides it per zone rather than per
+player, which is the cheaper shape: a ghost costs a zone once, not once for each observer who
+can see it.
+
+### What it does not have yet
+
+The spec puts a causal vector clock on each replica, `RelReplica` with `VClock`, so staleness
+is causal rather than wall-clock. This implementation has no clock on a ghost at all. That is
+the next thing to read rather than to invent.
