@@ -671,6 +671,101 @@ def mjxBestStepUs : Nat := 2177
 
 theorem mjx_is_ten_times_slower : mjxBestStepUs / stepBaselineUs = 10 := by native_decide
 
+/- ## The topology for a touchable thousand, and what actually costs money
+
+   A thousand who can all touch each other is one plane, so the topology question is what has
+   to sit beside that plane rather than how to split it.
+
+   Everything on the hot path shares one /dev/shm, because that is what iceoryx2 is. The edge
+   terminates the transport and hands the decoded result to a plane over the bus. The BEAM
+   reaches the ring through the NIF and never speaks iceoryx2. So the venue is one machine:
+
+     crowd plane        3 vCPU   1365 capacity, 1000 used
+     ring, NIF, BEAM    1 vCPU   control plane, placement, lifecycle
+     edge               4 vCPU   HTTP/3 and WebTransport for a thousand clients
+     ---------------------------------
+     one machine        8 vCPU
+
+   The store plane and FoundationDB are not on it. They talk over the network anyway, and
+   they are shared across venues rather than sized for one.
+
+   Then the arithmetic goes somewhere unexpected. -/
+
+/-- weft's entity packet, from `lean-entity-packet`. -/
+def packetBytes : Nat := 100
+
+/-- What one client is sent each publish, at the level of detail the interest radius implies:
+    the ten nearest bodies in full, and the seventy others as a root joint each. -/
+def nearBodiesFull : Nat := 10
+def farBodiesRoot : Nat := 70
+def entitiesPerClient : Nat := nearBodiesFull * joints + farBodiesRoot
+
+theorem a_client_gets_430_entities : entitiesPerClient = 430 := by native_decide
+
+/-- Bytes each second, downstream, for one client. -/
+def clientBytesPerSecond : Nat := entitiesPerClient * packetBytes * publishHz
+
+theorem a_client_takes_860_kb_a_second : clientBytesPerSecond = 860000 := by native_decide
+
+/-- 6.9 megabits, which is a video stream and not a control channel. -/
+theorem a_client_takes_seven_megabits :
+    clientBytesPerSecond * 8 / 1000000 = 6 := by native_decide
+
+/-- The whole venue, downstream. -/
+theorem the_venue_pushes_seven_gigabits :
+    people * clientBytesPerSecond * 8 / 1000000000 = 6 := by native_decide
+
+/- ### Egress costs more than the simulation, by a lot
+
+   Tenths of a cent again. The platform bills egress by the gigabyte, and 2 cents is the list
+   price for the regions this runs in. It varies, so it is a parameter and not a fact. -/
+
+def egressTenthCentsPerGb : Nat := 20
+
+/-- Gigabytes one head pulls in one hour of being present. -/
+def gbPerHeadHour : Nat := clientBytesPerSecond * 3600 / 1000000000
+
+theorem a_head_pulls_three_gigabytes_an_hour : gbPerHeadHour = 3 := by native_decide
+
+/-- Tenths of a cent for one head for one hour of presence. -/
+def egressTenthCentsPerHeadHour : Nat :=
+  clientBytesPerSecond * 3600 * egressTenthCentsPerGb / 1000000000
+
+theorem an_hour_of_presence_costs_61 : egressTenthCentsPerHeadHour = 61 := by native_decide
+
+/-- The venue machine, eight vCPUs, for one month, spread over a thousand heads. -/
+def machineCores : Nat := 8
+def machineTenthCentsPerHead : Nat := coreMonthCents * 10 * machineCores / people
+
+theorem the_machine_costs_304_for_each_head : machineTenthCentsPerHead = 304 := by
+  native_decide
+
+/-- THE FINDING. Five hours of presence in a month already costs more in egress than the
+    entire machine costs for the month. Compute was never the expensive part of a crowd. -/
+theorem five_hours_of_egress_beats_the_whole_machine :
+    5 * egressTenthCentsPerHeadHour > machineTenthCentsPerHead := by native_decide
+
+/-- At thirty hours in a month, which is an hour a day, egress is six times the machine. -/
+def occupancyHours : Nat := 30
+def egressTenthCentsPerHeadMonth : Nat := occupancyHours * egressTenthCentsPerHeadHour
+
+theorem egress_is_six_times_the_machine :
+    egressTenthCentsPerHeadMonth / machineTenthCentsPerHead = 6 := by native_decide
+
+theorem a_head_costs_2_16_a_month :
+    egressTenthCentsPerHeadMonth + machineTenthCentsPerHead = 2134 := by native_decide
+
+/-- The crowd plane itself is three of the eight cores, and it is under a twentieth of the
+    bill. Every hour spent making the body cheaper was spent on the small term. -/
+theorem the_simulation_is_a_twentieth_of_the_bill :
+    roomCost thousandCores * 100
+      / (egressTenthCentsPerHeadMonth + machineTenthCentsPerHead) = 3 := by native_decide
+
+/-- Which makes level of detail the lever that matters. Sending all eighty bodies in full
+    would be 2880 entities rather than 430, and the bill would follow it. -/
+theorem no_level_of_detail_costs_six_times_more :
+    (80 * joints) / entitiesPerClient = 6 := by native_decide
+
 /- ## Skeleton level of detail
 
    `lean-shared-core` puts the interest radius at 5 metres. A body outside it does not need
