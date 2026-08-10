@@ -925,10 +925,34 @@ theorem muscles_beat_rotations : rotationPackedBytes * 10 / musclePackedBytes = 
    flailing one is not, so the pose manifold that PCA and a learned model both exploit is
    simply absent from this data.
 
-   Which means the honest answer to whether a learned codec pays is that it cannot be
-   measured here. It needs recorded human motion, from a capture set or from live trackers,
-   and the crowd plane does not produce it yet. Both PCA and a small network would do far
-   better on coordinated motion than on this, and by how much is exactly the unknown.
+   ### Measured on real people, and the manifold is not there
+
+   MEASURED. `bench/wire_manifold.py` against sinew-mocap's calibrator set, which is 11794
+   real poses from 25 subjects across 11 AddBiomechanics studies, each pose 30 body segments
+   in the 6D continuous rotation representation.
+
+   The poses are genuinely natural and not a spread over the space. Two poses drawn at random
+   sit 34 degrees apart, where two uniform rotations sit 131 apart, and no segment has a
+   spread over 60 degrees. So this is a tight cloud of real human posture.
+
+   It is also not low rank. 59 of 180 components carry 90 percent of the variance and 124
+   carry 99. Truncating to 48 components still leaves a median segment 10 degrees wrong.
+   Stripping the global heading first, which is the one thing linear PCA provably cannot
+   represent, makes it slightly worse rather than better.
+
+   That contradicts what this file said one revision ago. Coordinated human motion being
+   famously low rank is a claim about a single activity, and it does not survive 25 subjects
+   and 11 studies. A pose is a small ball in a high dimensional space, not a thin sheet in
+   one. A linear latent has nothing to take.
+
+   So the burden on a learned codec went up rather than down. The autoencoder shape of the
+   idea is the one this measures, and it measures badly.
+
+   What this data cannot settle is the temporal question, and that is where every gain so far
+   has come from. Consecutive rows are 30 degrees apart, so the set holds a pose distribution
+   and not a motion. Frame to frame deltas, which took 26 bytes to 21, are unmeasurable in
+   it. A learned codec would have to win there, and answering that needs recorded sequences
+   rather than sampled poses.
 
    Two costs to weigh when that data exists. A trained model is the largest tuning constant
    a system can have, fitted to a workload, and weft's rule against tuning constants exists
@@ -939,6 +963,13 @@ theorem muscles_beat_rotations : rotationPackedBytes * 10 / musclePackedBytes = 
 
 /-- MEASURED on real simulated motion, order-1 context coding. The design number. -/
 def contextCodedBytes : Nat := 21
+
+/-- Real human pose, from the mocap set. Components for 90 percent of the variance, out of
+    180 dimensions. A thin sheet would put this in single figures. -/
+def poseComponentsFor90 : Nat := 59
+def poseDims : Nat := 180
+
+theorem real_pose_is_not_low_rank : poseComponentsFor90 * 3 > poseDims := by native_decide
 
 theorem context_coding_beats_order_zero :
     (26 - contextCodedBytes) * 100 / 26 = 19 := by native_decide
