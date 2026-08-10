@@ -219,3 +219,36 @@ optimising anything.
 What this does not license is deleting FoundationDB. The hot tier still needs it, and at the
 15 dollar scale a single node on the venue machine already covers that, which the 15 dollar
 topology assumed and the production topology forgot.
+
+## One FoundationDB, on disk, backed up to S3
+
+The entry above says a three-node cluster was priced where one node would do, and leaves open
+what a single node actually costs in safety. Two settings answer it, and both were already in
+`CLAUDE.md` without being put together.
+
+**The storage engine.** FoundationDB in `memory` mode keeps the whole dataset in RAM, so a 4
+GB machine caps actor state at a couple of gigabytes. In `ssd` mode the data is a B-tree on
+disk and the limit is the volume instead. A small machine then holds far more than the 15
+dollar topology needs, and the 4 GB is working memory rather than a ceiling.
+
+**The backups.** A three-node cluster buys redundancy: one node dies and the other two carry
+on. `fdbbackup` to the S3-compatible endpoint buys durability instead: the machine dies, and
+the data is restored from object storage.
+
+Those are different guarantees and only one of them is worth 314 dollars a month.
+
+| | three nodes | one node, ssd, backed up |
+| --- | --- | --- |
+| survives a node dying | yes, with no interruption | yes, after a restore |
+| survives losing the data | yes | yes |
+| downtime when a machine dies | none | minutes |
+| cost | 314 dollars a month | included in the venue machine |
+
+For a venue on a 15 dollar ceiling, minutes of downtime after a machine failure is obviously
+the right trade, and paying three times the machine bill to avoid it is obviously the wrong
+one. So the single-node configuration is `single` redundancy, the `ssd` engine, and
+`fdbbackup` streaming to `versitygw`, which is exactly the arrangement CLAUDE.md already
+describes for the packaged release.
+
+The three-node cluster is not deleted. It is what a deployment buys when downtime starts
+costing more than 314 dollars a month, and that is a threshold rather than an architecture.
