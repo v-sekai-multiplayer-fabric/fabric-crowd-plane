@@ -89,7 +89,7 @@ later layer cheat:
 | through a doorway | the airlock, hiding a 3.4 s wake | not built |
 | a different machine | placement, and a room that was stopped | not built |
 | that was asleep | scale to zero, which is what 15 dollars buys | measured, `bench/fly/room.py` |
-| with their state | durable actor storage | designed, `Weft.Actor` holds a memory map |
+| with their state | flush, then hand off | designed; the replicated store was deleted in #96 |
 | and keep pushing | the same contact solve on the far side | measured |
 
 The migration is in the thread on purpose. Without it the 15 dollar price is a lie, because

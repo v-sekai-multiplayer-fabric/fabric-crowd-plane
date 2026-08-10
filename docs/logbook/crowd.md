@@ -154,7 +154,29 @@ the room on the far side may be the same room. That is the part the earlier desi
 backwards: it treated the airlock as a graph edge between venues, when it is really the
 seam where the process running you changes.
 
-Which also settles what has to be true for it to work. Crossing must carry the player's
-durable state, so `Weft.Actor` needs to write to disk, which it does not yet. Until then a
-crossing loses everything, and a demo that loses everything on a doorway is worse than no
-doorway.
+### CORRECTION: a planned crossing loses nothing
+
+An earlier version of this paragraph said a crossing needs `Weft.Actor` to write to disk,
+that it does not, and that a doorway would therefore lose everything. That confused the code
+with the design and got the consequence backwards.
+
+`Weft.Actor.Store` specifies a local SQLite write-ahead log, which is disk, with **async
+replication to FoundationDB** behind it. The cost is stated in the module itself: a crash can
+lose the last few commits that were not yet replicated. That is the deliberate trade, and it
+is the right one, because a synchronous FoundationDB commit is about a millisecond and this
+is off the write path.
+
+The important part for an airlock is that **a crossing is planned**. A player walking through
+a doorway is not a crash. The actor knows it is about to move, so it flushes and then hands
+off, and the lazy replica is not what carries it. The lazy path only matters when a machine
+dies without warning, and losing the last few commits then is what the design already accepts
+everywhere else.
+
+So the doorway does not need new durability guarantees. It needs a flush-then-handoff, which
+is a smaller thing.
+
+What is genuinely missing is the code rather than the design. `Weft.Actor` holds a memory map
+today, and the prototype of the replicated store, `Weft.Actor.Store.Replicated` and its
+`.Replicator`, was deleted because CI kept failing on it. That deletion was about a flaky
+test rather than a wrong design, which is worth remembering before rebuilding it from
+scratch.
