@@ -87,25 +87,46 @@ def steerUs : Nat := 280
     threads all land within 4 percent of each other. -/
 def contactUs : Nat := 2433
 
-/-- MEASURED, and it is the at-scale cost, not the single-body cost.
+/- The musculoskeletal body, measured at scale. It is no longer the body a venue runs, but
+   its numbers stay because they are what the cheaper body is measured against.
 
-    One locomotion body alone advances a frame in 258 microseconds. The same body inside a
-    batch of 28 costs 433. Nothing about the body changed. The models share one MjModel and
-    each carries its own MjData, so what grew is the working set, and past about 14 bodies a
-    core is waiting on memory rather than computing. The cost per body then stops rising:
-    14, 28, and 56 all land within 5 percent of each other.
+   One locomotion body alone advances a frame in 258 microseconds. The same body inside a
+   batch of 28 costs 433. Nothing about the body changed. The models share one MjModel and
+   each carries its own MjData, so what grew is the working set, and past about 14 bodies a
+   core is waiting on memory rather than computing.
 
-    Quoting the single-body figure for a plane full of bodies overstates the answer by 1.7
-    times. This constant is the one a plane actually pays.
+   A frame is two substeps at an 8 millisecond timestep. That timestep is the only tuning
+   lever that moved anything: 2 ms costs 981 microseconds a frame, 4 ms costs 498, and 8 ms
+   costs 255 for a single body. Driven at full muscle load for 10 simulated seconds, every
+   one of those timesteps stayed stable and warned about nothing.
 
-    A frame is two substeps at an 8 millisecond timestep. That timestep is the only lever
-    that moved: 2 ms costs 981 microseconds a frame, 4 ms costs 498, and 8 ms costs 255 for
-    a single body, a 3.8-fold spread. Driven at full muscle load for 10 simulated seconds,
-    every one of those timesteps stayed stable and warned about nothing.
+   Solver iterations are not a lever. 100, 50, 20, 10, and 5 iterations all cost the same to
+   within a percent, because a body barely in contact has almost nothing to solve. -/
 
-    Solver iterations are not a lever. 100, 50, 20, 10, and 5 iterations all cost the same
-    to within a percent, because a body barely in contact has almost nothing to solve. -/
-def bodyFrameUs : Nat := 433
+/-- MEASURED, and it is the constant that decides the fleet.
+
+    A body sized to what an HMD and body tracking can observe. Six-point tracking reports
+    head, two hands, waist, and two feet. Eleven-point adds elbows and knees. Nothing
+    observes a muscle, a tendon, or a wrapping site, so this model carries none: 14 bodies,
+    14 capsules, 0 sites, 0 tendons, 32 degrees of freedom, 26 torque actuators.
+
+    It has almost the same degrees of freedom as the musculoskeletal body and costs a ninth
+    as much, which locates the expense. A stage profile of the musculoskeletal body puts 81
+    percent of a step in the position stage and 37 percent in forward kinematics alone. That
+    is 81 bodies, 2856 sites, and 100 tendons through 430 wrap points, all transformed every
+    step whether or not anything reads the muscle forces. Degrees of freedom were never the
+    cost. Kinematic bulk was.
+
+    This also holds flat under batching, where the musculoskeletal body does not: 48
+    microseconds a frame at a batch of 1 and 52 at a batch of 128. The working set stays in
+    cache, so the at-scale penalty that costs the musculoskeletal body 1.7 times does not
+    arise. -/
+def bodyFrameUs : Nat := 48
+
+/-- The musculoskeletal body, kept as the second tier rather than deleted. It simulates what
+    no tracker reports, so it is the right body for research and the wrong body for a
+    venue. -/
+def mskBodyFrameUs : Nat := 433
 
 def biomechUs : Nat := tickUs - publishUs - steerUs - contactUs
 
@@ -126,22 +147,31 @@ def planesFor (stepUs : Nat) : Nat :=
   let n := bodiesPerPlane stepUs
   if n = 0 then people else (people + n - 1) / n
 
-/-- THE ANSWER. Thirty-two bodies for each plane, every figure in it measured. -/
-theorem bodies_measured : bodiesPerPlane bodyFrameUs = 32 := by native_decide
-theorem planes_measured : planesFor bodyFrameUs = 32 := by native_decide
+/-- THE ANSWER. 289 tracked bodies for each plane, every figure in it measured. -/
+theorem bodies_measured : bodiesPerPlane bodyFrameUs = 289 := by native_decide
+theorem planes_measured : planesFor bodyFrameUs = 4 := by native_decide
 
-/-- Eight cores carry more than a hundred bodies, so a venue of a hundred people needs no
-    approximation at all. Every one of them is a real musculoskeletal body. -/
-theorem eight_cores_clear_a_hundred : 8 * bodiesPerPlane bodyFrameUs > 100 := by native_decide
+/-- A thousand people fit four cores, so a venue fits one machine with room to spare. This
+    is the theorem that retired the question of splitting a venue across machines. The
+    question was never answered. It was dissolved, by a body that costs a ninth as much.
 
-/-- A thousand does not fit one machine. Thirty-two planes is thirty-two cores, and the bus
-    is shared memory, so a venue cannot be split across machines. -/
-theorem a_thousand_needs_more_than_sixteen_cores : planesFor bodyFrameUs > 16 := by
+    weft forbids a path that carries per-tick state between machines, and
+    `docs/essays/yagni.md` names the one thing that would reopen it: a measured workload
+    that does not fit one machine. This measurement is the opposite of that. -/
+theorem a_thousand_fits_one_machine : planesFor bodyFrameUs * 4 ≤ 16 := by native_decide
+
+/-- Even a single core carries more than a quarter of the venue. -/
+theorem one_core_carries_a_quarter : bodiesPerPlane bodyFrameUs * 4 > people := by
   native_decide
 
-/-- The single-body cost would have promised 53 bodies for each plane. Believing it would
-    have sized the fleet at 0.6 of what the crowd needs, and the shortfall would only appear
-    once a plane was full. -/
+/-- The musculoskeletal body needs thirty-two planes for the same crowd, which is eight
+    times the fleet for detail no tracker reports. -/
+theorem msk_costs_eight_times_the_fleet :
+    planesFor mskBodyFrameUs / planesFor bodyFrameUs = 8 := by native_decide
+
+/-- The single-body cost would have promised 53 musculoskeletal bodies for each plane.
+    Believing it would have sized the fleet at 0.6 of what the crowd needs, and the
+    shortfall would only appear once a plane was full. -/
 def singleBodyFrameUs : Nat := 258
 
 theorem the_single_body_figure_overpromises :
