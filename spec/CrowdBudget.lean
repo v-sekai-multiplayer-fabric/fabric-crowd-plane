@@ -766,6 +766,113 @@ theorem the_simulation_is_a_twentieth_of_the_bill :
 theorem no_level_of_detail_costs_six_times_more :
     (80 * joints) / entitiesPerClient = 6 := by native_decide
 
+/- ### The wire, once every trick is applied
+
+   The 430-entity figure above sends a position and a rotation for every joint. A skeleton is
+   not that. A joint's position is determined by its parent's rotation and a bone length that
+   never changes, so the bone lengths go once at join time and every frame after that is
+   rotations. One position for the root, and nothing else in the body needs one.
+
+   That is the whole win, and it is structural rather than clever. Everything after it is
+   small by comparison. -/
+
+/-- Bits for each axis of a swing-twist rotation. 12 bits over a full turn is 0.09 degrees,
+    which is finer than a tracker reports. 10 bits was measured too and costs a quarter less,
+    at 0.35 degrees, which starts to show at the end of a long limb. -/
+def rotBits : Nat := 12
+
+/-- Bytes for one joint, bit-packed, three axes to a joint. -/
+def jointBytes : Nat := (3 * rotBits + 7) / 8
+
+/-- One body, packed: every joint as a rotation, plus one root position in micrometres. -/
+def bodyPackedBytes : Nat := joints * jointBytes + 12
+
+theorem a_packed_body_is_192_bytes : bodyPackedBytes = 192 := by native_decide
+
+/-- MEASURED. `bench/wire.py`. Frame-to-frame deltas of the packed form, through zstd at
+    level 3, over 400 frames of 16 bodies at a peak joint speed of 3 radians a second.
+
+    Compression alone is nearly worthless here, which is worth saying plainly: zstd on the
+    undifferenced packed form saves 3 percent, because quantised rotations are close to
+    uniform noise. It is the delta that gives zstd something to find, and even then the pair
+    together save a third rather than an order of magnitude. -/
+def nearBytesPerBodyFrame : Nat := 127
+
+/-- A body outside touching distance sends a root position and one rotation, and it sends
+    them at 5 Hz rather than 20, because a client interpolates between them and nobody can
+    tell at that distance. -/
+def farBytesPerBodyFrame : Nat := 16
+def farHz : Nat := 5
+
+def clientBytesPerSecondPacked : Nat :=
+  nearBodiesFull * nearBytesPerBodyFrame * publishHz + farBodiesRoot * farBytesPerBodyFrame * farHz
+
+theorem the_packed_client_takes_31_kb : clientBytesPerSecondPacked = 31000 := by native_decide
+
+/-- 27 times less than sending positions for every joint. -/
+theorem packing_is_twenty_seven_times_smaller :
+    clientBytesPerSecond / clientBytesPerSecondPacked = 27 := by native_decide
+
+/-- A quarter of a megabit for each client, and a quarter of a gigabit for the venue. That is
+    a control channel again rather than a video stream. -/
+theorem a_client_takes_a_quarter_megabit :
+    clientBytesPerSecondPacked * 8 / 1000000 = 0 := by native_decide
+
+theorem the_venue_pushes_a_quarter_gigabit :
+    people * clientBytesPerSecondPacked * 8 / 1000000 = 248 := by native_decide
+
+/- ### Encoding once for each cell, not once for each client
+
+   The other half of the ask is the pairwise part, and it does not move a single byte of
+   egress. Every client needs its own bytes down its own connection, so nothing short of
+   multicast changes that, and there is no multicast to the public internet.
+
+   What it does move is the edge. Encoding for each client means 430 entities encoded a
+   thousand times each frame. Encoding for each spatial cell means encoding a cell once and
+   sending the same bytes to everybody subscribed to it. The bodies do not care who is
+   watching, so the encode is shared and only the selection of cells is per client. -/
+
+def cells : Nat := 20
+def bodiesPerCell : Nat := people / cells
+
+def encodesPerFramePerClient : Nat := people * entitiesPerClient
+def encodesPerFramePerCell : Nat := cells * bodiesPerCell
+
+theorem per_cell_encoding_is_430_times_less :
+    encodesPerFramePerClient / encodesPerFramePerCell = 430 := by native_decide
+
+/- ### The machine, and the bill, after all of it -/
+
+/-- The edge no longer carries 6.9 gigabits, so it no longer needs four cores. Two. -/
+def machineCoresPacked : Nat := 6
+
+def machineTenthCentsPerHeadPacked : Nat := coreMonthCents * 10 * machineCoresPacked / people
+
+def egressTenthCentsPerHeadHourPacked : Nat :=
+  clientBytesPerSecondPacked * 3600 * egressTenthCentsPerGb / 1000000000
+
+def egressTenthCentsPerHeadMonthPacked : Nat :=
+  occupancyHours * clientBytesPerSecondPacked * 3600 * egressTenthCentsPerGb / 1000000000
+
+theorem the_packed_machine_costs_228 : machineTenthCentsPerHeadPacked = 228 := by native_decide
+theorem packed_egress_is_66_a_month : egressTenthCentsPerHeadMonthPacked = 66 := by native_decide
+
+/-- 29.4 cents for each head each month, against 213 before the wire was looked at. -/
+theorem a_packed_head_costs_294 :
+    machineTenthCentsPerHeadPacked + egressTenthCentsPerHeadMonthPacked = 294 := by native_decide
+
+theorem the_wire_saved_seven_times :
+    (egressTenthCentsPerHeadMonth + machineTenthCentsPerHead)
+      / (machineTenthCentsPerHeadPacked + egressTenthCentsPerHeadMonthPacked) = 7 := by
+  native_decide
+
+/-- And it hands the problem back to compute. Egress was 87 percent of the bill and is now
+    22, so the machine is the term to attack next and the body work matters again. -/
+theorem egress_is_now_a_fifth :
+    egressTenthCentsPerHeadMonthPacked * 100
+      / (machineTenthCentsPerHeadPacked + egressTenthCentsPerHeadMonthPacked) = 22 := by
+  native_decide
+
 /- ## Skeleton level of detail
 
    `lean-shared-core` puts the interest radius at 5 metres. A body outside it does not need
