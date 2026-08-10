@@ -472,22 +472,28 @@ Training needs a GPU-parallel backend: the MuJoCo backend asserts `num_envs == 1
 inference only. Newton 1.0.0 with Warp 1.16.0 installs cleanly and is what the training below
 uses.
 
-## Running the pretrained tracker, which does nothing
+## Running the pretrained tracker, which diverges
 
 `~/.config/systemd/user/weft-tracker.service`. The SOMA BONES-SEED FSQ motion tracker,
 69 MB of PPO weights for a 23-body humanoid with 66 actions, run against its own
 `soma23_bones_seed_mini` motion set in the MuJoCo backend.
 
-It loads 61 motions and steps. It also does nothing:
+It loads 61 motions and steps. It never acts, and then it explodes:
 
     WARNING:absl: Nan, Inf or huge value in QACC at DOF 0. Time = 0.0030
-    [Step   1] root_pos=[0,0,0] root_vel=[0.00,0.25,2.20] max_dof_vel=9.653 max_ctrl=0.0 ncon=27
-    [Step 601] root_pos=[0,0,0] root_vel=[0.00,0.25,2.20] max_dof_vel=9.653 max_ctrl=0.0 ncon=27
+    [Step    1] root_vel=[0.00, 0.25, 2.20]      max_dof_vel=      9.653  max_ctrl=0.0
+    [Step  601] root_vel=[0.00, 0.25, 2.20]      max_dof_vel=      9.653  max_ctrl=0.0
+    [Step 2901] root_vel=[956.35, 539.38, 376.77] max_dof_vel= 200126.487  max_ctrl=0.0
 
-Six hundred steps apart and byte-identical, with `max_ctrl=0.0`, so the policy emits no
-torque at all. The model card says it was trained in IsaacLab, and nothing claims the weights
-transfer to MuJoCo. The NaN in QACC on the first step says the same. A pretrained checkpoint
-is only pretrained for the simulator it was trained in.
+`max_ctrl` is 0.0 at every step, so the policy emits no torque at any point. Steps 1 and 601
+are byte-identical, which reads like a frozen state, and by step 2901 the root is travelling
+at 956 metres a second. So it is not merely inert: with no control at all the free bodies
+integrate into nonsense, and the NaN in QACC on the very first step was the warning.
+
+The model card says the weights were trained in IsaacLab. Nothing claims they transfer to
+MuJoCo, and they do not. A pretrained checkpoint is only pretrained for the simulator it was
+trained in, which is the finding: the fast path of taking NVIDIA's weights off the shelf is
+closed unless the simulator matches.
 
 ### Four things that had to be fixed before it would even run
 
@@ -525,4 +531,19 @@ Hips root and a standard humanoid hierarchy. This is a retarget away from a SOMA
 `addb-all`, 67 GB, is AddBiomechanics as train and test splits under `With_Arm`, by study:
 Han2023, Carter2023, vanderZee2022 and others. This is the same corpus the sinew calibrator
 set was sampled from, except these are sequences rather than sampled poses, so it is also
-what the temporal compression question needed and could not get earlier.
+what the temporal compression question needed and could not get earlier. Copying it over SMB
+runs at about 6.6 MB a second, so it takes about three hours.
+
+### The fork this leaves
+
+Two ways to a controller, and they differ in kind rather than in effort.
+
+Retrain in Newton on the 4090, using the Mixamo clips as the motion prior for
+`examples/experiments/steering`. Hours of training on hardware that is already here, and the
+result is ours and matches our simulator.
+
+Or install IsaacLab and use NVIDIA's checkpoints as they are. A large install, but their
+weights work immediately and their skeleton, SOMA-23, is one we would likely adopt anyway.
+
+The second is faster to a demo and the first is faster to a product, because a policy trained
+in a simulator we do not run is a policy we cannot change.
