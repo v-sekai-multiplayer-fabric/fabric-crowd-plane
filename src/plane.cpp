@@ -32,6 +32,8 @@
 
 namespace {
 
+constexpr int kSubsteps = 2;   // 8.3 ms physics inside a 16.7 ms frame
+
 double env_double(const char* name, double fallback) {
   const char* v = std::getenv(name);
   return v ? std::atof(v) : fallback;
@@ -166,7 +168,9 @@ int main(int argc, char** argv) {
     const int steps = clock.advance(elapsed);
     for (int s = 0; s < steps; ++s) {
       const auto t0 = Clock::now();
-      mj_step(m, d);
+      // The model steps at 8.3 ms: a crowd in contact loses a metre of penetration at 16.7
+      // and goes NaN. A 60 Hz frame is therefore two steps, not one.
+      for (int k = 0; k < kSubsteps; ++k) mj_step(m, d);
       const double us = std::chrono::duration<double, std::micro>(Clock::now() - t0).count();
       if (us > worst_step_us) worst_step_us = us;
       ++tick;

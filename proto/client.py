@@ -93,7 +93,8 @@ class Skeleton:
 
 async def main():
     import websockets
-    server = viser.ViserServer()
+    # Bind where the platform expects when hosted, and on localhost otherwise.
+    server = viser.ViserServer(host="0.0.0.0", port=int(os.environ.get("VISER_PORT", "8080")))
     server.scene.add_grid("/floor", width=40.0, height=40.0)
     # The command is what the steering task takes: a move direction, and a facing that is
     # independent of it. Jump and crouch are separate again.

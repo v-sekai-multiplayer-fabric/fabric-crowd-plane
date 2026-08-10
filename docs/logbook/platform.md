@@ -494,3 +494,32 @@ Recordings are two-pass: lossless FFV1 first, then AV1 with the title burned in 
 `CITATION.cff` metadata in the container. Capture and encode are separate jobs, and a slow
 encoder must not drop frames of the thing being recorded. 30 seconds, with a 9:16 cut.
 They are artefacts and are not committed.
+
+## Three apps, and what each is for
+
+| app | what it is | state |
+| --- | --- | --- |
+| `weft-plane` | the native C++ plane. No networking, as a plane should have none. | 60.0 Hz, worst frame 11.2 ms of 16.7 |
+| `weft-room` | the Python plane with a WebSocket, which the viewer needs | running |
+| `weft-view` | a hosted Viser scene server, so the crowd has a URL | https://weft-view.fly.dev |
+
+Hosting the viewer is a demo convenience and not the architecture. **The browser is still the
+renderer.** What moved to the cloud is the scene bookkeeping that normally runs on the
+player's machine, and the cost of moving it is that the last hop stops being weft's 22-byte
+wire and becomes Viser's own protocol, which nobody has measured. That is written into
+`deploy/Dockerfile.view` so the next reader does not mistake one for the other.
+
+### A substep bug, caught by arithmetic rather than by looking
+
+Setting the model timestep to 8.3 ms fixed the teleporting and immediately introduced a
+quieter fault: both planes still called `mj_step` **once** for each 16.7 ms tick. One step is
+now 8.3 ms of world time, so the world was advancing at half speed while every clock in the
+loop said 60 Hz.
+
+Nothing looked wrong. The frame rate was right, the tick counter was right, and the crowd
+simply moved in slow motion. A wall clock cannot catch that, because the loop was keeping
+perfect time; only the ratio between simulated time and real time shows it.
+
+Both planes now take two substeps for each frame. `SUBSTEPS` and `kSubsteps` sit next to the
+timestep with the reason written down, because the two numbers are one decision and changing
+either alone is this bug.

@@ -26,6 +26,7 @@ from touchable import venue
 from entity_packet import Packet, SIZE, PACKET_DTYPE, empty as empty_packets
 
 TICK = 1.0 / 60
+SUBSTEPS = 2                   # 8.3 ms physics steps inside a 16.7 ms frame
 PUBLISH_EVERY = 3                    # 20 Hz on the wire
 N = int(os.environ.get("BODIES", "60"))
 SPACING = float(os.environ.get("SPACING", "0.9"))
@@ -122,7 +123,10 @@ class Room:
                 have = math.atan2(zaxis[1], zaxis[0])
                 err = (want - have + math.pi) % (2 * math.pi) - math.pi
                 self.d.xfrc_applied[r, 5] = err * FACE_TORQUE
-        mujoco.mj_step(self.m, self.d)
+        # The model steps at 8.3 ms because a crowd in contact is not stable at 16.7, so a
+        # 60 Hz frame is two of them. Stepping once would advance the world at half speed.
+        for _ in range(SUBSTEPS):
+            mujoco.mj_step(self.m, self.d)
 
     def geometry(self):
         """Sent once: the skeleton the client needs to turn muscles back into positions.
