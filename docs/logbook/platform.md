@@ -142,10 +142,21 @@ useful part.
 | cost | 8 dollars a month | 15 |
 | admission control | a hard cap of 1000 connections | tick load p99 under 1, and a person-hour budget |
 
-**It is the layer this design calls the control plane and the store plane.** Accounts,
-persistence, and user data are exactly what weft needs and does not have, and Gamend does
-them at 4000 connections for 8 dollars. The two compose rather than compete: one holds who
-you are, the other holds where your body is this millisecond.
+**CORRECTION.** An earlier draft of this entry said accounts and persistence are "exactly
+what weft needs and does not have". That is wrong, and weft's own `lib/` says so: about 3000
+lines of Elixir holding `Weft.Actor`, a single-writer actor addressed by `{name, key}`,
+`Weft.Actor.Store` with the SQLite-over-FoundationDB design, `Weft.Pool` for serverless
+runner pools, plus zones, gateway, interest, and limits. All of it rivet-shaped. The overlap
+with Gamend is real and it is large: two Elixir game backends with actors and persistence.
+
+What weft has that is genuinely absent is **durability**. `Weft.Actor` says it plainly: state
+is an in-memory map standing in for per-actor KV, and the SQLite-over-FoundationDB store is a
+design rather than code. Gamend has a working store at 4000 connections. weft has a better
+design for a different tier and no rows on disk.
+
+So the two do compose, but not the way that draft claimed. It is not that one supplies a
+missing layer. It is that they serve two different tiers of persistence which this design has
+been treating as one.
 
 ### The number that matters, and it is the latency
 
@@ -181,3 +192,30 @@ degrade for everybody. Their write-up also records that 256 MB ran out of memory
 database timeouts dominated until caching went in, which is the same shape as this logbook
 finding that the microbenchmark stopped being true inside a loop. Both are the difference
 between measuring a component and running a system.
+
+## Two tiers of persistence, costed as one
+
+The correction above exposes a sizing error worth its own entry.
+
+The full production bill puts 442.52 dollars a month into persistence: a three-node
+FoundationDB cluster at 314.16, a store plane at 83.36, and 300 GB of volumes at 45.00. That
+was sized because the architecture mandates FoundationDB, and it was sized once for two jobs.
+
+Those jobs are not alike.
+
+**Hot actor state** is per-actor SQLite pages behind a single-writer invariant, read and
+written while a body is being simulated, and it is what FoundationDB is for: no local file,
+so an actor's database migrates between machines with no copy. That is `Weft.Actor.Store`.
+
+**Metagame state** is accounts, profiles, and inventory. It has no deadline, it is read far
+more than written, and a request-response store on a shared vCPU serves it. That is what
+Gamend does for 8 dollars.
+
+Charging the second at the price of the first is the mistake. If the metagame tier costs 8
+rather than 442, the full production bill falls from 1679.05 to about 1244.53 a month, which
+is 1.24 for each head against 1.68. A 26 percent cut from deleting an assumption rather than
+optimising anything.
+
+What this does not license is deleting FoundationDB. The hot tier still needs it, and at the
+15 dollar scale a single node on the venue machine already covers that, which the 15 dollar
+topology assumed and the production topology forgot.
