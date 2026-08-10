@@ -330,39 +330,181 @@ def replicasFor (authoritative : Nat) : Nat :=
 theorem four_hundred_authoritative_sees_thirteen_thousand :
     replicasFor 400 = 13759 := by native_decide
 
-/-- Eight thousand people, twenty planes, everybody visible to everybody. Each plane has
-    authority over 400 and holds replicas of the other 7600, and it still fits its core. -/
-def bigVenue : Nat := 8000
-def bigVenueAuthority : Nat := 400
+/- ### The fanout stops at the machine
 
-theorem a_big_venue_is_twenty_planes :
-    (bigVenue + bigVenueAuthority - 1) / bigVenueAuthority = 20 := by native_decide
+   Interest is a fanout from the other simulating planes, and that fanout is shared memory.
+   iceoryx2 does not cross a machine. Two planes on different machines go through the store
+   plane to FoundationDB, which is a global transaction measured in milliseconds, so a
+   50 millisecond publish period does not buy it back.
 
-theorem everybody_sees_everybody :
-    bigVenueAuthority * perPersonNs + (bigVenue - bigVenueAuthority) * interestNsEach
+   The platform decides what that means, and the platform models a core as its own machine.
+   A plane that is its own Fly app lands on its own machine, and then it has no neighbours to
+   fan out from at all: it sees exactly the people it simulates.
+
+   So mutual visibility is not free and it is not bought with tick budget. It is bought by
+   putting several planes on one machine, on one Fly app with several vCPUs, sharing one
+   /dev/shm. The venue that can see itself is therefore capped by the largest machine the
+   platform sells, and not by anything in this file. -/
+
+/-- Tenths of a cent for one core for one month. weft already pays it: thirty-two cores
+    carrying a thousand people came to 122 cents for each head. -/
+def coreMonthCents : Nat := 3812
+
+/-- The vCPUs on the largest machine the platform offers. Not a tuning constant. It is a
+    property of what can be bought, and the venue size follows from it. -/
+def coresPerMachine : Nat := 16
+
+/- ### More than one core for one plane
+
+   A plane was one core because a plane is a thread-per-core harness and one core was enough.
+   Give it two and the question is what actually gets faster.
+
+   Bodies do. Each carries its own MjData and touches nothing else, so splitting them across
+   threads is splitting independent work. Contact does not. A thousand capsules in one model
+   was measured at 1, 4, 8, and 16 threads and all four landed within 4 percent of each
+   other, so the contact layer is serial in practice whatever it is in principle.
+
+   That makes contact the serial fraction, and it decides how far a plane is worth widening.
+   It is 2433 nanoseconds of 31758, which is under a tenth, so two cores nearly double a
+   plane and sixteen cores do not come close to multiplying it by sixteen. -/
+
+def parallelNs : Nat := perPersonNs - contactNsEach
+
+theorem the_serial_share_is_seven_percent :
+    contactNsEach * 100 / perPersonNs = 7 := by native_decide
+
+/-- People for one plane, given the cores it is given. Contact is paid once for each person
+    whatever the core count. Everything else divides. -/
+def peopleOn (cores : Nat) : Nat :=
+  tickUs * 1000 / (contactNsEach + parallelNs / cores)
+
+theorem one_core_holds_524 : peopleOn 1 = 524 := by native_decide
+theorem two_cores_hold_974 : peopleOn 2 = 974 := by native_decide
+theorem four_cores_hold_1706 : peopleOn 4 = 1706 := by native_decide
+theorem sixteen_cores_hold_3907 : peopleOn 16 = 3907 := by native_decide
+
+/-- Two cores are worth 1.85 planes, which is most of two. This is the reason to stop at two
+    rather than at four. -/
+theorem two_cores_scale_at_ninety_three_percent :
+    peopleOn 2 * 100 / (peopleOn 1 * 2) = 92 := by native_decide
+
+/-- Sixteen cores are worth 7.4 planes, so more than half of them are lost to the contact
+    layer. Widening a plane has a knee and this is past it. -/
+theorem sixteen_cores_scale_at_forty_six_percent :
+    peopleOn 16 * 100 / (peopleOn 1 * 16) = 46 := by native_decide
+
+/- ### The size of one contact neighbourhood
+
+   This is what the extra core actually buys, and it is not throughput. Everyone on one plane
+   is under one authority, so everyone on one plane can touch everyone else. The plane is the
+   contact neighbourhood, so widening the plane widens the crowd that can press together.
+
+   A thousand people who can all reach each other is the interesting venue, and two cores
+   nearly reach it. Three cores pass it. -/
+
+theorem three_cores_hold_a_thousand : peopleOn 3 > people := by native_decide
+theorem two_cores_do_not : peopleOn 2 < people := by native_decide
+
+/- ### Cores for each plane, once the fanout is in the budget
+
+   Applying a replica is an independent write, so it divides across cores like the bodies do.
+   Contact still does not. So the whole of a plane except contact scales, and the question is
+   how to cut one machine into planes.
+
+   Cutting it finely makes many small contact neighbourhoods. Cutting it coarsely makes few
+   large ones. What is not obvious is what happens to the venue in between. -/
+
+def planesOn (cores : Nat) : Nat := coresPerMachine / cores
+
+/-- Authority for each plane, derived from its cores and how many planes share its machine.
+    Contact is serial and everything else, replicas included, divides. -/
+def sharedAuthority (cores : Nat) : Nat :=
+  tickUs * 1000 /
+    (contactNsEach + (parallelNs + (planesOn cores - 1) * interestNsEach) / cores)
+
+/-- A venue that can see itself, which is one machine's worth of planes. -/
+def visibleVenue (cores : Nat) : Nat := planesOn cores * sharedAuthority cores
+
+theorem sixteen_planes_of_one : visibleVenue 1 = 7376 := by native_decide
+theorem eight_planes_of_two : visibleVenue 2 = 7360 := by native_decide
+theorem four_planes_of_four : visibleVenue 4 = 6676 := by native_decide
+theorem one_plane_of_sixteen : visibleVenue 16 = 3907 := by native_decide
+
+/-- THE REASON TO TAKE THE SECOND CORE. Two cores for each plane cost the same machine and
+    show the same venue, to within a fifth of a percent, and double the crowd a person can
+    actually touch. It is not a trade. Sixteen planes of one core is simply the worse cut. -/
+theorem two_cores_show_the_same_venue :
+    visibleVenue 2 * 1000 / visibleVenue 1 = 997 := by native_decide
+
+theorem two_cores_double_the_contact_neighbourhood :
+    sharedAuthority 2 / sharedAuthority 1 = 1
+      ∧ sharedAuthority 2 * 100 / sharedAuthority 1 = 199 := by native_decide
+
+/-- Past two the venue starts paying. Four cores for each plane shows nine percent fewer
+    people, because four planes fan out to fewer neighbours than eight and the machine ends
+    up carrying more authority than it has room for. -/
+theorem four_cores_start_costing_the_venue :
+    visibleVenue 4 * 100 / visibleVenue 1 = 90 := by native_decide
+
+/-- The extreme: one plane holding the whole machine sees only what it simulates, and every
+    one of those 3907 can touch every other. Nothing is stale anywhere. It is the smallest
+    visible venue and the largest contact neighbourhood, which is the trade stated at both
+    ends. -/
+theorem one_big_plane_is_all_contact : visibleVenue 16 = sharedAuthority 16 := by native_decide
+
+/-- Each plane fits its cores. -/
+theorem the_visible_venue_fits :
+    sharedAuthority 2 *
+        (contactNsEach + (parallelNs + (planesOn 2 - 1) * interestNsEach) / 2)
       ≤ tickUs * 1000 := by native_decide
 
-/-- It fills 89 percent of the tick, so this is the edge of the design and not a comfortable
-    middle. -/
-theorem the_big_venue_is_tight :
-    (bigVenueAuthority * perPersonNs + (bigVenue - bigVenueAuthority) * interestNsEach) * 100
-      / (tickUs * 1000) = 89 := by native_decide
-
-/- One thing this does not buy, and it is the reason the airlocks stay.
+/- ### What is still not bought, and why the airlocks stay
 
    A replica is read-only and it is allowed to be stale. Somebody a person can see may be a
    frame or two behind and nothing is wrong. Somebody a person can touch may not be, because
    contact needs both bodies under one authority in one solve.
 
-   So interest spans planes and contact does not. A person sees the whole venue and can push
-   only the 400 on their own plane. The boundary has to fall where a crowd does not press
-   against it, which is what an airlock or a low-density corridor is for.
+   So interest spans planes on one machine, and contact never spans a plane at all. A person
+   sees the whole machine and can push only the 400 on their own plane. That boundary has to
+   fall where a crowd does not press against it, which is what an airlock or a low-density
+   corridor is for.
 
-   It also does not span machines cheaply. Two planes on one machine trade replicas over
-   iceoryx2, zero copy. Two planes on different machines go through the store plane to
-   FoundationDB, which is a global transaction measured in milliseconds. At a 50 millisecond
-   publish period that is not obviously impossible, and it is not measured, so this section
-   claims one machine only. -/
+   Past one machine there is no fanout, so a room on another machine is not dimmed or
+   delayed. It is not there. An airlock between machines is opaque, and this is the one place
+   where the constraint and the fiction agree without being made to: nobody expects to see
+   through a door. -/
+
+/- ### The two venues, and what each costs
+
+   These are alternatives, and the choice is a deployment choice rather than a code one. -/
+
+/-- An isolated room: one plane, its own machine, sees only itself. -/
+def roomCost (cores : Nat) : Nat := coreMonthCents * 10 * cores / peopleOn cores
+
+/-- A shared machine cut into planes, everybody visible to everybody. -/
+def venueCost (cores : Nat) : Nat := coreMonthCents * 10 * coresPerMachine / visibleVenue cores
+
+/-- An isolated room gets cheaper for each head the narrower its plane is, because contact is
+    the serial part and a narrow plane pays less of it for each person. 7.2 tenths of a cent
+    at one core, 7.8 at two, 8.9 at four. -/
+theorem a_one_core_room_costs_72 : roomCost 1 = 72 := by native_decide
+theorem a_two_core_room_costs_78 : roomCost 2 = 78 := by native_decide
+theorem a_four_core_room_costs_89 : roomCost 4 = 89 := by native_decide
+
+/-- On a shared machine the cut at one core and the cut at two cost the same, to the tenth of
+    a cent. So the second core is free and the contact neighbourhood it doubles is free with
+    it. -/
+theorem one_and_two_cores_cost_the_same : venueCost 1 = venueCost 2 := by native_decide
+theorem a_shared_venue_costs_82 : venueCost 2 = 82 := by native_decide
+
+/-- Cutting coarser is what costs. -/
+theorem four_cores_cost_more : venueCost 4 = 91 := by native_decide
+theorem sixteen_cores_cost_double : venueCost 16 = 156 := by native_decide
+
+/-- Mutual visibility costs a seventh more for each head than an isolated room of the same
+    shape. That is the price of the fanout, and it is paid in tick budget, not in cores. -/
+theorem visibility_costs_a_seventh_more :
+    venueCost 2 * 100 / roomCost 2 = 105 := by native_decide
 
 /- ## Cost
 
@@ -370,7 +512,6 @@ theorem the_big_venue_is_tight :
    core-month price is the one weft already pays: thirty-two cores carrying a thousand people
    came to 122 cents for each head, which puts a core-month at 3812 cents. -/
 
-def coreMonthCents : Nat := 3812
 def tenthCentsPerHead (cores : Nat) : Nat := coreMonthCents * 10 * cores / people
 
 /-- 121.9 cents, the musculoskeletal answer, for detail no tracker reports. -/
