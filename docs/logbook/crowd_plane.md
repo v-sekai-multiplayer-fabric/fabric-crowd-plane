@@ -250,3 +250,48 @@ anybody deciding it should.
 What it costs is the promise. A venue cannot advertise a size it will always hold. It can
 advertise what it holds on the worst machine it will keep, and give back the rest as
 headroom. That is weaker than a fixed capacity and it is the true one.
+
+## A ten minute tick loop, which is where the microbenchmark stopped being true
+
+`bench/fly/tick_loop.py`. Fly `performance-2x`, `sjc`, machine `2872616f530748`. 301 bodies,
+one core, 36000 ticks at 60 Hz, a fixed schedule, and a count of every tick that overran.
+301 is what the microbenchmark on the good machine said one core holds at p90.
+
+| | us |
+| --- | --- |
+| budget for a tick | 16667 |
+| work, p50 | 16525 |
+| work, p90 | 17275 |
+| work, p99 | 20723 |
+| work, p99.9 | 24115 |
+| work, max | 45505 |
+| tick start lateness, p99 | 236931 |
+| tick start lateness, max | 286227 |
+
+**13150 ticks of 36000 missed. 36.5 percent.**
+
+Two things in that table are worse than the arithmetic that preceded it.
+
+The work itself is 18 percent above what the microbenchmark predicted: 55 microseconds for
+each body against 46.4. A microbenchmark steps the same bodies in a tight loop with
+everything hot. A tick loop sleeps between passes, and what it wakes up to is a colder
+cache. The difference is not measurement error. It is the cost of being a loop.
+
+And the lateness is the real result. A tick begins a quarter of a second after it was due,
+at p99. Work never exceeded 45 milliseconds, so a tick that starts 237 milliseconds late was
+not delayed by its own work. It was descheduled. This is a shared tenancy virtual machine
+and the hypervisor takes the core away for intervals far longer than a frame.
+
+So 99 percent load is not a tight fit. It is a broken one, and a p90 from fifteen samples
+over a few seconds cannot see it. Every capacity figure derived from the microbenchmarks
+above should be read as a ceiling that is never reached.
+
+| physics share of the tick | people for one core, at 55 us a body |
+| --- | --- |
+| 100 percent | 303 |
+| 75 percent | 227 |
+| 50 percent | 151 |
+
+The load ratio in `spec/CrowdBudget.lean` is what makes this safe without a constant. This
+entry is why it is needed: the number that was wrong was not the body cost. It was the
+belief that a measured body cost predicts a loop.
