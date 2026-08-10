@@ -70,6 +70,20 @@ seconds. A linear policy trained with ARS does not learn it in 2750 iterations. 
 are recorded, and both say the same thing, which is that standing balance for a 27 degree of
 freedom humanoid is a real problem and not a gain to tune.
 
+## What `proto/server.py` is, and is not
+
+It is a **viewer**, and it breaks three rules to be one: the plane is Python where the rule
+says C++, it talks over a WebSocket where the transport is HTTP/3 and WebTransport and never
+HTTP/1.1, and it reaches clients over sockets where planes reach things over iceoryx2.
+
+It is kept because looking at the physics is worth something and it took an hour. It is not
+the steel thread and must not be described as one. A steel thread is thin and **real**; that
+file is thin and fake, and it exercises none of the layers the design is made of.
+
+The one charge it does not answer to is speed. `bench/fly/tick_loop.py` is also Python and
+held 60 Hz on Fly with one missed tick in 36000 at 60 bodies. Python can carry a
+prototype-scale tick. It cannot prove the design.
+
 ## The steel thread
 
 The prototype is one thin path that touches every layer, end to end, and it is not a demo of
@@ -94,6 +108,21 @@ later layer cheat:
 
 The migration is in the thread on purpose. Without it the 15 dollar price is a lie, because
 the price comes from machines that stop, and machines that stop mean players that move.
+
+### The native side, honestly
+
+`native/dataplane` is 135 lines: a seqlock ring and a throughput smoke test. It does not link
+iceoryx2, does not run MuJoCo, and has no tick loop. `native/nif` is 112 lines and works. So
+the plane is unwritten and the ring under it is not.
+
+That splits the thread into two pieces with very different costs.
+
+**The plane, in C++, writing the ring, read by the BEAM through the NIF.** About 300 lines,
+because three of the four parts exist. Every link in that chain is a layer the design
+specifies, so it is a real thread with the client cut off the end. This is next.
+
+**The edge.** A WebTransport server means a QUIC stack, and that is days rather than hours.
+It costs the same whether it is built before the plane or after, so it goes after.
 
 ## The speedrun, in order
 
