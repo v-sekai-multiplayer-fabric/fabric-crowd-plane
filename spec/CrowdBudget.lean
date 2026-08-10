@@ -1142,13 +1142,37 @@ theorem per_cell_encoding_is_430_times_less :
 /-- The measured floor. Four converges, two does not, and there is nothing in between. -/
 def iterationsFloor : Nat := 4
 
-/-- Four iterations on two cores clears a thousand, with 7 percent to spare. -/
-theorem four_iterations_reaches_a_thousand_on_two_cores :
-    16666000 / (2433 + (45 + 280 + 25820) / 2) = 1075 := by native_decide
+/- ### The tail decides it, not the median
 
-/-- And ten iterations does not, which is why this was worth measuring. -/
-theorem ten_iterations_does_not :
-    16666000 / (2433 + (45 + 280 + 26090) / 2) < people := by native_decide
+   Chasing the solver was chasing the wrong number. Measured carefully at batches of 14, 28,
+   and 56, the body costs 26.7 to 27.3 microseconds a frame at the median and 30.4 to 31.4 at
+   the ninetieth percentile. The spread is 15 percent and it is the same at every batch size,
+   so it is not cache and not measurement noise. It is what a contact solver does when the
+   contact set changes.
+
+   A 60 Hz deadline is met at the tail or it is missed. Sizing a real-time budget on a median
+   means missing it a tenth of the time, and a tenth of 60 Hz is six dropped frames a second.
+
+     median 27.3 us   two cores hold 1024   three hold 1429
+     p90    31.4 us   two cores hold  911   three hold 1281
+
+   Two cores clear a thousand at the median and miss it at the tail. Three clear it at the
+   tail with 28 percent spare. So the crowd plane is 3 vCPU, and the reason is the tail rather
+   than anything about the solver. -/
+
+def bodyMedianNs : Nat := 27340
+def bodyP90Ns : Nat := 31410
+
+def peopleAt (bodyNs : Nat) (cores : Nat) : Nat :=
+  tickUs * 1000 / (contactNsEach + (publishNsEach + steerNsEach + bodyNs) / cores)
+
+theorem two_cores_pass_at_the_median : peopleAt bodyMedianNs 2 = 1024 := by native_decide
+theorem two_cores_fail_at_the_tail : peopleAt bodyP90Ns 2 < people := by native_decide
+theorem three_cores_pass_at_the_tail : peopleAt bodyP90Ns 3 = 1281 := by native_decide
+
+/-- 28 percent of headroom at the tail, which is what a deadline needs. -/
+theorem three_cores_have_headroom :
+    peopleAt bodyP90Ns 3 * 100 / people = 128 := by native_decide
 
 /-- The shipped wire: order-1 context coding, 21 bytes of muscle deltas plus a root position,
     at 20 Hz for the bodies within touching distance. Distant bodies send a root position at
