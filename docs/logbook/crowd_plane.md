@@ -309,3 +309,52 @@ venue worth building is one room.
 The cold start numbers keep their value under a different heading. Scale to zero makes an
 empty room free, which is what the 15 dollar budget rests on, and 3.4 seconds is how long a
 returning player waits. Neither has anything to do with travel between rooms.
+
+## The feature, measured for the first time
+
+`bench/touchable.py`. Every measurement before this one gave each avatar its own MjData, so
+avatars passed through one another. That is cheaper and it is not the product. This is one
+model, one contact solve, and avatars that collide with each other.
+
+Desk. 100 avatars, varying how close they stand. They have no balance controller, so they
+collapse into a heap, and a heap presses far harder than a standing crowd. Read these as an
+upper bound on cost.
+
+| spacing | us/frame | p99 us | person-person contacts | load at p99 |
+| --- | --- | --- | --- | --- |
+| 0.60 m | 6046 | 34657 | 331 | 2.08 |
+| 0.75 m | 5879 | 8961 | 277 | 0.54 |
+| 1.00 m | 4532 | 7328 | 159 | 0.44 |
+| 1.50 m | 3395 | 4871 | 0 | 0.29 |
+| 2.50 m | 3421 | 4755 | 0 | 0.29 |
+
+Two things follow, and the second is the important one.
+
+Touch is not free. A body that touches nobody costs 34 microseconds a frame here. The same
+body at shoulder distance costs 59. So contact roughly doubles a person, and it does it in a
+solve that cannot be split across machines.
+
+And the cost arrives at the tail, not the median. At 0.6 metres the median is 6046 and the
+p99 is 34657, which is 5.7 times worse. A 60 Hz deadline is met at the tail. So the crowd
+that breaks a room is not the average crowd, it is the moment the average crowd bunches, and
+nothing in the median warns of it.
+
+Scaling at 0.75 m spacing:
+
+| avatars | us/frame | p99 | load at p99 |
+| --- | --- | --- | --- |
+| 25 | 1596 | 2300 | 0.14 |
+| 50 | 3224 | 7575 | 0.45 |
+| 100 | 5489 | 8208 | 0.49 |
+| 200 | 11589 | 23717 | 1.42 |
+| 400 | 19757 | 83015 | 4.98 |
+
+So the touchable ceiling is about 150 on the desk and about 90 on Fly, against the 500 this
+logbook has been assuming. The 500 came from a thousand free capsules at 2.4 microseconds
+each, and a free capsule is not a person: an avatar is 14 capsules on 27 joints, and when two
+of them press the solver couples both articulated bodies into one island.
+
+The next measurement is not an optimisation. It is a balance controller. These bodies are
+falling over, and a heap of ragdolls is the worst contact case there is. A standing crowd
+touches at the shoulders. Whether the ceiling is 90 or 500 depends on that number, and it
+does not exist yet.
