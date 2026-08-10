@@ -269,3 +269,62 @@ it.
 band, and `rewards/unnormalized_amp_rewards` should stop falling. If both happen and
 `env/total_env_reward_mean` is still flat at 0.41, then H2 was real and insufficient, and H1
 becomes the next suspect rather than H3.
+
+## The inputs, and how few of them are trained
+
+Two lists get conflated. What a player sends is not what the policy sees.
+
+### What the steering task takes today
+
+Read from `examples/experiments/steering/mlp.py`. The whole command is three things:
+
+| field | shape | what it is |
+| --- | --- | --- |
+| `tar_dir` | 2 | which way to move, a unit vector on the ground |
+| `tar_speed` | 1 | how fast |
+| `tar_face_dir` | 2 | which way to face, separately from moving |
+
+Direction and facing being separate is exactly a twin-stick controller: left stick moves,
+right stick or the headset's yaw turns, and strafing falls out of the pair without anything
+being added for it.
+
+The policy's observation is larger and is not player input: full body state in maximal
+coordinates, the same again as 8 steps of history, the root rotation, and the three fields
+above. The history is what lets it infer contact and momentum without being told.
+
+### What the product needs and does not have
+
+| input | source | trained? |
+| --- | --- | --- |
+| move direction, 2 | left stick, or waist translation in roomscale | **yes** |
+| move speed, 1 | stick magnitude | **yes** |
+| face direction, 2 | headset yaw, or right stick | **yes** |
+| jump | button | no |
+| crouch | headset height, or button | no |
+| head pose, 6DOF | HMD | no |
+| hand poses, 2 x 6DOF | controllers | no |
+| waist and feet, 3 x 6DOF | trackers, optional | no |
+
+So the controller under training can walk where it is pointed and nothing else. Jump and
+crouch are extra task components. The tracked upper body is a different problem again: those
+are not commands to a locomotion policy, they are targets for a motion tracker, which is the
+other pretrained model in this repository and the reason both halves exist.
+
+### Upstream costs almost nothing, and it was never costed
+
+Every wire measurement in `wire.md` is downstream. Upstream, at 60 Hz, 4 bytes a float:
+
+| what the client sends | floats | kB/s |
+| --- | --- | --- |
+| steering command only | 5 | 1.2 |
+| plus jump, crouch, sprint | 6 | 1.4 |
+| plus 3-point tracking | 27 | 6.5 |
+| plus 6-point | 48 | 16.6 |
+| plus 11-point | 83 | 35.0 |
+
+Downstream is 10.8 kB/s a client, so a fully tracked player sends about three times what
+they receive. That inverts the usual assumption and it is still small: 35 kB/s times a
+thousand players is 35 MB/s inbound, which is a fraction of what the venue already pushes
+out. Ingress is not billed on the platform, so it costs machine time rather than money, and
+the machine time is the edge decoding it, which remains the one unmeasured term in the
+topology.
