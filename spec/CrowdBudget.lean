@@ -1154,7 +1154,7 @@ def iterationsFloor : Nat := 4
    means missing it a tenth of the time, and a tenth of 60 Hz is six dropped frames a second.
 
      median 27.3 us   two cores hold 1024   three hold 1429
-     p90    31.4 us   two cores hold  913   three hold 1284
+     p90    31.4 us   two cores hold  910   three hold 1280
 
    Two cores clear a thousand at the median and miss it at the tail. Three clear it at the
    tail with 28 percent spare. So the crowd plane is 3 vCPU, and the reason is the tail rather
@@ -1168,7 +1168,7 @@ def peopleAt (bodyNs : Nat) (cores : Nat) : Nat :=
 
 theorem two_cores_pass_at_the_median : peopleAt bodyMedianNs 2 = 1024 := by native_decide
 theorem two_cores_fail_at_the_tail : peopleAt bodyP90Ns 2 < people := by native_decide
-theorem three_cores_pass_at_the_tail : peopleAt bodyP90Ns 3 = 1284 := by native_decide
+theorem three_cores_pass_at_the_tail : peopleAt bodyP90Ns 3 = 1280 := by native_decide
 
 /-- 28 percent of headroom at the tail, which is what a deadline needs. -/
 theorem three_cores_have_headroom :
