@@ -118,3 +118,22 @@ uncompressed.
 
 `packet_golden.csv` is the conformance test, and a C++ decoder already passes it. Anything
 this repository writes should pass it too rather than assert compatibility.
+
+## Conformance: 64 of 64 golden vectors
+
+`proto/entity_packet.py` mirrors the Lean codec field for field, and
+`proto/test_packet_golden.py` checks it both ways against `packet_golden.csv`: decode must
+reproduce the fields, and re-encoding must reproduce the canonical bytes exactly.
+
+**64 pass, 0 fail.**
+
+It caught one bug, and it was the kind a README cannot catch. The table in the repository
+lists field offsets, and reading it left a 4-byte gap between velocity at 28 and the HLC at
+40. The Lean says 6: velocity ends at 34 and bytes 34 to 39 are unused. The header is 58
+bytes, not 56, and the assertion that the header must end where the payload begins failed on
+the first run.
+
+That is the argument for the golden vectors existing. A summary of a format is not the
+format, and this book has now been caught twice in one day working from summaries: once here
+and once when a wire format was measured from scratch while a specified one sat in the
+organisation with proofs attached.
