@@ -98,9 +98,40 @@ def main():
             for k in range(a.shape[-1]):
                 h += ent_ctx(a[:, :, jj, k].ravel(), c_all[:, :, jj, k].ravel())
     print(f"  {'plus an order-1 context model':46} {bits(h):7.1f} B/body/frame")
+    # 5. Do not vary what the receiver can derive. The schema still has a position on every
+    #    joint; it simply stops changing, so the delta is always zero and costs no bits. The
+    #    client reconstructs each joint from its parent's rotation and a static bone length.
+    zeros = np.zeros_like(dRel)
+    derived = report("derived joints: position held constant", [zeros, dRoot, dR])
+    h2 = 0.0
+    for a in (zeros, dRoot, dR):
+        c_all = ctx_of(a)
+        for jj in range(a.shape[2]):
+            for k in range(a.shape[-1]):
+                h2 += ent_ctx(a[:, :, jj, k].ravel(), c_all[:, :, jj, k].ravel())
+    print(f"  {'the same, plus order-1 context':46} {bits(h2):7.1f} B/body/frame")
+    # 6. The i16 rotation field does not need all 16 bits. A quaternion component quantised
+    #    to 12 bits is 0.09 degrees, finer than any tracker reports, and the value still
+    #    travels in the i16 the schema defines.
+    print()
+    print("  rotation precision, positions still derived:")
+    best = None
+    for b_ in (16, 12, 10, 8):
+        step = 1 << (16 - b_)
+        Rq = (R // step) * step
+        dRq = np.diff(Rq, axis=0, prepend=Rq[:1])
+        hq = 0.0
+        for a in (zeros, dRoot, dRq):
+            c_all = ctx_of(a)
+            for jj in range(a.shape[2]):
+                for k in range(a.shape[-1]):
+                    hq += ent_ctx(a[:, :, jj, k].ravel(), c_all[:, :, jj, k].ravel())
+        deg = 360.0 / (1 << b_)
+        print(f"    {b_:2} bits an axis ({deg:5.2f} deg)          {bits(hq):7.1f} B/body/frame")
+        if b_ == 12: best = bits(hq)
     print()
     print(f"  body-oriented encoding, measured earlier     21.0 B/body/frame")
-    print(f"  gap remaining                                {bits(h)/21:.1f}x")
+    print(f"  packet at 12-bit rotations over that         {best/21:.2f}x")
 
 
 if __name__ == "__main__":

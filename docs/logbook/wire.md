@@ -317,3 +317,44 @@ pooled across joints and counted once instead of summed over all 39 values in a 
 number was ten times too good and looked plausible. It was caught by comparing against the
 earlier packet measurement of 108, which is the argument for making a new measurement agree
 with an old one before believing it.
+
+## CORRECTION: the packet was measured carrying the wrong thing
+
+Every packet measurement in this book packed raw quaternion components into the rotation
+field. The field is `i16 swing-twist x3`, and the pose representation this project chose is
+the Mecanim muscle system: three scalars for a joint, each normalised to an anatomical range.
+Swing-twist and muscles are the same decomposition. The field already fits what we send, and
+I filled it with something we would never send.
+
+That made every comparison in this book unfair in the same direction: quaternion-per-joint
+packets measured against a muscle-space body encoding.
+
+`bench/wire_packet_muscle.py`, same motion, same method, muscles in the rotation field with
+per-muscle bit depth taken from each joint's own range at 0.088 degrees:
+
+| form | B/body/frame |
+| --- | --- |
+| packet with quaternions, positions derived, order-1 | 53.5 |
+| **packet with muscles, positions derived, order-1** | **26.1** |
+| body-oriented encoding, measured earlier | 21.0 |
+
+**1.24 times, not 2.55.** The residue is the root position in int64 micrometres and the parts
+of the envelope that do not compress to nothing.
+
+### What that does to the decision
+
+| wire | kB/s | egress share | always-on for 15 dollars |
+| --- | --- | --- | --- |
+| packet with quaternions, as wrongly measured | 5.1 | 79 percent | 42 |
+| **packet with muscles** | **2.9** | **59** | **57** |
+| body-oriented, if we diverged | 2.5 | 55 | 59 |
+
+The earlier entry recorded that taking the org packet costs 35 always-on players, and framed
+that as a deliberate trade of capacity for one format and one conformance test. **That cost
+was almost entirely my measurement error.** The real price is 2 players out of 59, which is
+not a trade at all.
+
+So the decision to accept the packet was right, and the reasoning under it was wrong. The
+skeleton-class extension discussed earlier is also unnecessary: the position field does not
+need removing from the schema, it only needs to stop varying, and the rotation field was
+already the correct shape.
