@@ -285,6 +285,85 @@ def roomsFor (crowd : Nat) : Nat := (crowd + peoplePerPlane - 1) / peoplePerPlan
 theorem a_thousand_is_two_rooms : roomsFor people = 2 := by native_decide
 theorem ten_thousand_is_twenty_rooms : roomsFor 10000 = 20 := by native_decide
 
+/- ## Authority costs. Interest almost does not.
+
+   524 is the number of bodies a plane can be the authority for. Authority is the single
+   writer of an entity, so somebody pays the full 31758 nanoseconds for every person in the
+   world exactly once.
+
+   Interest is different in kind. A `CH_INTEREST` replica is read-only: the plane applies
+   incoming joint entities and never integrates them. No contact solve, no constraint solve,
+   no dynamics. It costs what it costs to write 36 numbers into a table.
+
+   So the two are not variants of one thing to be traded off percentage by percentage. They
+   are a hundred to one, and that ratio is the design. -/
+
+/-- MEASURED. One core applying entity updates against a table too large for cache. This is
+    the apply side, and it is a different measurement from the 1.25 nanosecond publish cost
+    above, which is the write side. -/
+def measuredAppliesPerSecond : Nat := 41200000
+
+/-- weft measured one core applying 41.2 M entity updates each second against a table too
+    large for cache, which is 24 nanoseconds for each. -/
+def applyNsEach : Nat := 1000000000 / measuredAppliesPerSecond
+
+/-- One interest replica, for one 60 Hz frame. Replicas arrive at the publish rate, so a body
+    costs its 36 joints once every third frame. -/
+def interestNsEach : Nat := joints * applyNsEach / ticksPerPublish
+
+theorem an_apply_is_24_ns : applyNsEach = 24 := by native_decide
+theorem a_replica_costs_288_ns : interestNsEach = 288 := by native_decide
+
+/-- THE RATIO. One body a plane has authority over costs the same as a hundred it can merely
+    see. Seeing is not the expensive part of a crowd, and it never was. -/
+theorem one_authority_buys_a_hundred_replicas :
+    perPersonNs / interestNsEach = 110 := by native_decide
+
+/-- Replicas a plane can carry once its authority is set. -/
+def replicasFor (authoritative : Nat) : Nat :=
+  (tickUs * 1000 - authoritative * perPersonNs) / interestNsEach
+
+/-- A plane that gives up a quarter of its authority sees the whole of a large venue.
+
+    400 bodies simulated, 13000 more visible. The crowd a person looks at is 33 times the
+    crowd their own plane is computing. -/
+theorem four_hundred_authoritative_sees_thirteen_thousand :
+    replicasFor 400 = 13759 := by native_decide
+
+/-- Eight thousand people, twenty planes, everybody visible to everybody. Each plane has
+    authority over 400 and holds replicas of the other 7600, and it still fits its core. -/
+def bigVenue : Nat := 8000
+def bigVenueAuthority : Nat := 400
+
+theorem a_big_venue_is_twenty_planes :
+    (bigVenue + bigVenueAuthority - 1) / bigVenueAuthority = 20 := by native_decide
+
+theorem everybody_sees_everybody :
+    bigVenueAuthority * perPersonNs + (bigVenue - bigVenueAuthority) * interestNsEach
+      ≤ tickUs * 1000 := by native_decide
+
+/-- It fills 89 percent of the tick, so this is the edge of the design and not a comfortable
+    middle. -/
+theorem the_big_venue_is_tight :
+    (bigVenueAuthority * perPersonNs + (bigVenue - bigVenueAuthority) * interestNsEach) * 100
+      / (tickUs * 1000) = 89 := by native_decide
+
+/- One thing this does not buy, and it is the reason the airlocks stay.
+
+   A replica is read-only and it is allowed to be stale. Somebody a person can see may be a
+   frame or two behind and nothing is wrong. Somebody a person can touch may not be, because
+   contact needs both bodies under one authority in one solve.
+
+   So interest spans planes and contact does not. A person sees the whole venue and can push
+   only the 400 on their own plane. The boundary has to fall where a crowd does not press
+   against it, which is what an airlock or a low-density corridor is for.
+
+   It also does not span machines cheaply. Two planes on one machine trade replicas over
+   iceoryx2, zero copy. Two planes on different machines go through the store plane to
+   FoundationDB, which is a global transaction measured in milliseconds. At a 50 millisecond
+   publish period that is not obviously impossible, and it is not measured, so this section
+   claims one machine only. -/
+
 /- ## Cost
 
    Tenths of a cent, because the answer is 7.3 and a whole cent loses a third of it. The
@@ -384,7 +463,6 @@ theorem lod_root_cuts_traffic_ninefold : entities / entitiesAtLod 1 = 9 := by na
    weft measured one core applying 41.2 M entity updates each second against a table too
    large for cache. Published at 20 Hz, a thousand full skeletons ask for a tenth of that. -/
 
-def measuredAppliesPerSecond : Nat := 41200000
 
 def ringPercentOfCore (farJoints : Nat) : Nat :=
   ringPerSecond farJoints * 100 / measuredAppliesPerSecond
