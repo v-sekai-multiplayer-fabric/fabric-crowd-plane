@@ -405,6 +405,17 @@ theorem sixteen_cores_scale_at_forty_six_percent :
 theorem three_cores_hold_a_thousand : peopleOn 3 > people := by native_decide
 theorem two_cores_do_not : peopleOn 2 < people := by native_decide
 
+/-- THE MACHINE FOR A THOUSAND. Three vCPUs, one plane, no fanout and no airlock, and every
+    one of the thousand can touch every other. 8.4 tenths of a cent for each head each month.
+
+    Two cores reach 974, which is close enough to be tempting and is not a thousand. The next
+    size up the platform sells is what gets bought, so this is a four vCPU machine holding
+    1706 with a third of it spare. -/
+def thousandCores : Nat := 3
+
+theorem three_cores_are_enough : peopleOn thousandCores ≥ people := by native_decide
+theorem two_cores_are_not : peopleOn (thousandCores - 1) < people := by native_decide
+
 /- ### Cores for each plane, once the fanout is in the budget
 
    Applying a replica is an independent write, so it divides across cores like the bodies do.
@@ -458,6 +469,85 @@ theorem the_visible_venue_fits :
         (contactNsEach + (parallelNs + (planesOn 2 - 1) * interestNsEach) / 2)
       ≤ tickUs * 1000 := by native_decide
 
+/- ### Scaling the machine up, and the thing that stops it
+
+   vCPUs on one Fly machine share one /dev/shm, so planes on it trade replicas over iceoryx2
+   and the venue grows with the machine. That is the direction to grow in, because growing
+   sideways buys nothing: another machine cannot fan out to this one.
+
+   Growing up has a shape, though, and it is not the shape it looks like. A plane replicating
+   every other plane holds replicas in proportion to the plane count, and there are also that
+   many planes, so the machine does work in proportion to the square of it. The venue still
+   grows. The price for each head grows too, and eventually the replicas crowd out the
+   bodies. -/
+
+def venueAllToAll (machineCores : Nat) : Nat :=
+  let planes := machineCores / 2
+  planes * (tickUs * 1000 /
+    (contactNsEach + (parallelNs + (planes - 1) * interestNsEach) / 2))
+
+def costAllToAll (machineCores : Nat) : Nat :=
+  coreMonthCents * 10 * machineCores / venueAllToAll machineCores
+
+theorem all_to_all_16 : venueAllToAll 16 = 7360 ∧ costAllToAll 16 = 82 := by native_decide
+theorem all_to_all_64 : venueAllToAll 64 = 24736 ∧ costAllToAll 64 = 98 := by native_decide
+theorem all_to_all_256 : venueAllToAll 256 = 60288 ∧ costAllToAll 256 = 161 := by native_decide
+
+/-- Sixteen times the machine buys eight times the venue, and each head costs twice as much.
+    That is the quadratic showing up as a price. -/
+theorem all_to_all_scales_sublinearly :
+    venueAllToAll 256 * 100 / venueAllToAll 16 = 819 := by native_decide
+
+theorem all_to_all_doubles_the_price :
+    costAllToAll 256 * 100 / costAllToAll 16 = 196 := by native_decide
+
+/- ### Culling by interest makes it linear
+
+   A plane replicating every other plane is replicating people nobody on it can see.
+   `lean-shared-core` puts the interest radius at 5 metres, and a plane holding one region of
+   the venue needs only the band of the neighbouring regions that falls inside that radius.
+
+   The size of that band is what matters, and the trap is to count it for each person. Eighty
+   people stand within 5 metres of somebody, but the plane holds the union over everybody on
+   it, not the sum. Those eighty are mostly the same eighty. What a plane replicates is a
+   border, and a border grows with the edge of a region rather than its area.
+
+   Written as a multiple of the plane's own authority, the border is the only term that
+   matters, and the answer barely depends on it. -/
+
+/-- Authority for each plane, when replicas are a border band `k` times its own authority. -/
+def culledAuthority (k : Nat) : Nat :=
+  tickUs * 1000 / (contactNsEach + (parallelNs + k * interestNsEach) / 2)
+
+def venueCulled (k : Nat) (machineCores : Nat) : Nat :=
+  machineCores / 2 * culledAuthority k
+
+def costCulled (k : Nat) : Nat := coreMonthCents * 10 * 2 / culledAuthority k
+
+/-- A border of one plane's worth, of two, of four. The price moves by two percent across
+    all three, so the border does not have to be estimated well. -/
+theorem a_border_of_one : culledAuthority 1 = 966 ∧ costCulled 1 = 78 := by native_decide
+theorem a_border_of_two : culledAuthority 2 = 958 ∧ costCulled 2 = 79 := by native_decide
+theorem a_border_of_four : culledAuthority 4 = 943 ∧ costCulled 4 = 80 := by native_decide
+
+/-- THE POINT. The price for each head does not depend on the machine at all, because a plane
+    replicates its neighbours and not the venue. Vertical scaling becomes linear. -/
+theorem culled_cost_is_flat_in_machine_size :
+    costCulled 2 = coreMonthCents * 10 * 16 / venueCulled 2 16
+      ∧ costCulled 2 = coreMonthCents * 10 * 256 / venueCulled 2 256 := by native_decide
+
+theorem culled_scales_linearly :
+    venueCulled 2 256 * 16 = venueCulled 2 16 * 256 := by native_decide
+
+theorem a_big_machine_holds_a_hundred_thousand :
+    venueCulled 2 256 = 122624 := by native_decide
+
+/-- Culling is already ahead at the smallest machine, and it is ahead by 2.6 times at the
+    largest. Nothing about it is a large-venue optimisation. -/
+theorem culling_wins_everywhere :
+    venueCulled 2 16 > venueAllToAll 16
+      ∧ venueCulled 2 256 * 10 / venueAllToAll 256 = 20 := by native_decide
+
 /- ### What is still not bought, and why the airlocks stay
 
    A replica is read-only and it is allowed to be stale. Somebody a person can see may be a
@@ -490,6 +580,10 @@ def venueCost (cores : Nat) : Nat := coreMonthCents * 10 * coresPerMachine / vis
 theorem a_one_core_room_costs_72 : roomCost 1 = 72 := by native_decide
 theorem a_two_core_room_costs_78 : roomCost 2 = 78 := by native_decide
 theorem a_four_core_room_costs_89 : roomCost 4 = 89 := by native_decide
+
+/-- A thousand people who can all touch each other: three vCPUs, 8.3 tenths of a cent for
+    each head each month. -/
+theorem a_thousand_costs_83 : roomCost thousandCores = 83 := by native_decide
 
 /-- On a shared machine the cut at one core and the cut at two cost the same, to the tenth of
     a cent. So the second core is free and the contact neighbourhood it doubles is free with
