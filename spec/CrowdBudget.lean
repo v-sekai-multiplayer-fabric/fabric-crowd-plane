@@ -789,14 +789,42 @@ def bodyPackedBytes : Nat := joints * jointBytes + 12
 
 theorem a_packed_body_is_192_bytes : bodyPackedBytes = 192 := by native_decide
 
-/-- MEASURED. `bench/wire.py`. Frame-to-frame deltas of the packed form, through zstd at
-    level 3, over 400 frames of 16 bodies at a peak joint speed of 3 radians a second.
+/-- MEASURED, and it is the NASTY protocol. weft has two wire formats and this is the
+    hot-path one: bitpacked, cast to decode, never self-describing. The cheap CBOR JSON-LD
+    format is the debug and interop edge and is costed below.
 
-    Compression alone is nearly worthless here, which is worth saying plainly: zstd on the
-    undifferenced packed form saves 3 percent, because quantised rotations are close to
-    uniform noise. It is the delta that gives zstd something to find, and even then the pair
-    together save a third rather than an order of magnitude. -/
+    `bench/wire.py` and `bench/wire_cheap_vs_nasty.py`, 300 to 400 frames of 16 bodies at a
+    peak joint speed of 3 radians a second.
+
+    The order of the pipeline decides the answer, which is the part worth remembering.
+    Quantise, then delta, then zstd gives 127 bytes. Quantise, then pack, then zstd gives
+    158, and giving zstd the previous frame as a dictionary gains nothing at all on top.
+    Packing first destroys the delta: once three 12 bit fields are smeared across byte
+    boundaries, consecutive frames no longer look alike to a compressor. So the bits get
+    packed last or not at all.
+
+    Compression on its own is nearly worthless here. zstd on the undifferenced packed form
+    saves 9 percent, because quantised rotations are close to uniform noise. It is the delta
+    that gives zstd something to find. -/
 def nearBytesPerBodyFrame : Nat := 127
+
+/-- The same skeletal frame as cheap CBOR JSON-LD: named joints, float rotations,
+    self-describing. 1168 bytes raw, 884 with zstd and the previous frame as a dictionary. -/
+def cheapBytesPerBodyFrame : Nat := 884
+
+/-- Nasty is 7 times smaller than cheap here, and on the vehicle trace it was 2.3. The gap
+    widens with the structure, because a self-describing format pays for every name and a
+    body has 36 joints where a vehicle had 3 fields. So the choice between the two formats
+    matters more for a crowd than it did for traffic, and it is the same choice. -/
+theorem nasty_is_seven_times_smaller_than_cheap :
+    cheapBytesPerBodyFrame / nearBytesPerBodyFrame = 6 := by native_decide
+
+/-- Sending the crowd as cheap CBOR would put the venue back above two gigabits, which is
+    where it was before the wire was looked at. The interop edge is not the hot path, and
+    this is the arithmetic that says why. -/
+theorem cheap_would_undo_the_whole_saving :
+    people * (nearBodiesFull * cheapBytesPerBodyFrame * publishHz) * 8 / 1000000000 = 1 := by
+  native_decide
 
 /-- A body outside touching distance sends a root position and one rotation, and it sends
     them at 5 Hz rather than 20, because a client interpolates between them and nobody can
