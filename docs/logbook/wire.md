@@ -180,3 +180,70 @@ simplicity.
 
 One caveat on the figure: this measured 13 joints a body, and the crowd budget assumes 36. A
 36-joint body makes the packet form proportionally worse, so 24 is the optimistic end.
+
+## The three netcode levers, and which of them this design actually uses
+
+Asked plainly: interpolation, extrapolation, and sending intents with rollback over
+deterministic code. None had been applied systematically, and one had been broken outright.
+
+### Extrapolation: measured, and it works the opposite way round
+
+The packet carries a velocity at offset 28, scaled to V_MAX, and its purpose is exactly this.
+Every measurement in this book sent it as **zero**.
+
+`bench/wire_extrapolate.py`, position error a viewer would see, in millimetres:
+
+| send rate | hold, mean | hold p99 | extrapolate, mean | extrapolate p99 |
+| --- | --- | --- | --- | --- |
+| 20 Hz | 59.5 | 266 | **32.3** | **203** |
+| 10 Hz | 112.0 | 508 | 85.3 | 532 |
+| 5 Hz | 197.8 | 826 | 210 | 1220 |
+| 2 Hz | 363.6 | 1231 | 599 | 3333 |
+
+It halves the error at 20 Hz and **makes things worse below 10**. Limbs swing, so carrying a
+joint forward in a straight line overshoots the turn, and the further it is carried the more
+confidently wrong it gets.
+
+So extrapolation is a quality lever at a fixed rate, not a way to lower the rate. That is the
+reverse of how it is usually reached for, and it means filling in the velocity field is worth
+doing while cutting the send rate on the strength of it is not.
+
+### Interpolation: available, and it costs the thing being sold
+
+Buffering a frame and interpolating between two known states is smooth by construction and
+never overshoots. It costs one frame of latency, minimum, and this design already spends its
+latency budget on a 16.7 millisecond tick to make a shove feel instant.
+
+For **far** bodies that is free: nobody can push them, so a frame of delay is undetectable,
+and the design already sends them at a lower rate. For bodies within reach it is the one
+thing not to do.
+
+### Intents, rollback, and deterministic code: does not survive a crowd
+
+Sending only inputs and having every participant simulate the same thing is the cheapest wire
+there is. It is how fighting games and lockstep strategy games work, and it needs bit-exact
+determinism, which is what a fixed-ISA sandbox like libriscv would provide.
+
+It does not fit here, for a reason that has nothing to do with determinism. **Every client
+would have to simulate every body.** A room holds 139 bodies at 55 microseconds each, which
+is a whole core, and the clients are headsets. Lockstep trades bandwidth for compute on every
+participant, and this workload has no compute to spare on the participants.
+
+Emulation makes it worse: a fixed ISA is slower than native by a large factor, and the budget
+already spends 91 percent of a person on the body.
+
+What survives from that family is the half that needs no determinism: **predict your own
+avatar locally and reconcile against the server.** One body, not 139, and a mismatch corrects
+against authority rather than requiring everyone to agree in advance. That is ordinary
+netcode and it is worth doing.
+
+### Where that leaves the wire
+
+| lever | verdict |
+| --- | --- |
+| velocity in the packet, extrapolated at 20 Hz | **use it** — halves the error, costs nothing, currently zeroed |
+| extrapolate to justify a lower rate | do not — worse than holding below 10 Hz |
+| interpolate far bodies | use it — they are already slow and cannot be touched |
+| interpolate near bodies | do not — it spends the latency the product sells |
+| lockstep over a deterministic sandbox | no — every client would simulate the whole room |
+| local prediction of your own body | worth doing, and needs no determinism |
