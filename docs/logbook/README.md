@@ -25,7 +25,8 @@ holds the measurements. `../../PLAN.md` says what is being built.
 | `wire.md` | the wire format, from 3600 bytes a body to 21 |
 | `platform.md` | Fly: the body measured there, the variance between machines, and a tick loop that missed a third of its frames |
 | `crowd.md` | bodies that touch each other, and the stance controller that does not work yet |
-| `controller.md` | learning one: ARS, ProtoMotions, the datasets, and two open predictions |
+| `controller.md` | learning one: ARS, ProtoMotions, the datasets, and the training hypotheses |
+| `inference.md` | what running the policy costs, and how to make it console-fast |
 
 ## Open predictions
 
