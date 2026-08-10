@@ -1273,6 +1273,33 @@ theorem the_bad_machine_fills_the_venue : 5 + 1 + 2 = 8 := by native_decide
 theorem a_slightly_worse_machine_does_not_fit :
     peopleAt 80000 5 < people ∧ peopleAt 80000 6 > people := by native_decide
 
+/- ### What is not in this budget
+
+   Four layers are costed here: publish, steer, contact, and the body. Between them they
+   fill 99 percent of a tick at 301 people on one good core. That is not a venue. It is
+   physics with nothing left over, and a tick with no room in it cannot run a game.
+
+   Two different things are missing and they have different answers.
+
+   **Per-tick game logic has no tier in weft, and that is a decision rather than a gap.**
+   `Weft.Limits` gives an actor a 60 second action and a request rate, which is an
+   event-driven contract and not a frame-driven one. Gameplay is an actor acting on an
+   event, the BEAM reads the ring through the NIF at about 3 microseconds, and none of that
+   sits inside the 60 Hz loop. A game engine that expects a script pass every frame does not
+   map onto this, and anything that truly must run every tick has to be native code inside
+   the plane, where it would be a fifth layer nobody has measured.
+
+   **Scheduler headroom is missing outright, and that one is a gap.** These are shared
+   tenancy virtual machines. A budget that plans to 99 percent has left nothing for the
+   hypervisor, and the difference between 99 percent of a tick and a missed frame is
+   whatever the host does next.
+
+   So every per-core figure in this file is a physics-only upper bound. `peopleAt` answers
+   how many bodies fit if nothing else runs, and something else always runs. The load ratio
+   below is what makes that safe in practice, because it measures the whole tick and not the
+   part that was modelled. What it cannot do is make the planning numbers honest, and until
+   a fifth layer is measured they should be read as ceilings rather than capacities. -/
+
 /- ### The load ratio, which replaces it
 
    Dimensionless, in parts per thousand so it stays in Nat. -/
