@@ -25,7 +25,7 @@ import asyncio, os, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from interest import InterestSet, Tracked, Zone, expansion, SIM_HZ, HYSTERESIS_TICKS
-from handoff import Placer, WAKE_S, FLUSH_S, SAFETY
+from handoff import Placer, WAKE_S, OPEN_S, SAFETY
 
 W = 15_000_000                      # a room is 15 m
 SCALE = float(os.environ.get("SCALE", "10"))
@@ -67,7 +67,9 @@ async def main():
         return woken[room]
 
     async def flush(eid):
-        await asyncio.sleep(FLUSH_S / SCALE)
+        # Not a flush. The actor has no local file, so nothing needs shipping: this is the
+        # far side opening the database, which is a FoundationDB read path.
+        await asyncio.sleep(OPEN_S / SCALE)
 
     placer = Placer(wake=wake, flush=flush)
 

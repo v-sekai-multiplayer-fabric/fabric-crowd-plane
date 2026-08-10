@@ -351,3 +351,47 @@ came back in 2.64, 2.79 and 2.77 seconds. The flush is a sleep, because the stor
 call is the code deleted in #96.
 
 Neither of those is a question about whether the design works. They are wiring.
+
+## There is nothing to flush, and two documents disagree about why
+
+The crossing budgeted 150 milliseconds to flush an actor's state before handing it over. That
+was modelling a design weft does not use.
+
+`CLAUDE.md` and `fabric-store-plane/prove_handoff.c` agree: **an actor has no local database
+file.** SQLite runs over a VFS whose pages are in FoundationDB, and `PRAGMA
+journal_mode=MEMORY` stops it writing a journal. So a commit is already durable and already
+visible to every other machine. A handoff is a close and an open, and `prove_handoff.c` exists
+to demonstrate exactly that: two processes sharing nothing but FoundationDB, the reader with
+no file to copy and no restore step.
+
+What remains is the open on the far side, which is a FoundationDB read path. A synchronous
+FoundationDB transaction was measured at about 1.9 milliseconds, so the crossing is a few
+milliseconds.
+
+    t= 6.42s x=15.01m  CROSSED   into room-b, waited 11 ms
+
+Down from 153.
+
+### The disagreement
+
+`lib/weft/actor/store.ex` describes something else entirely: a local SQLite file for each
+actor in WAL mode, async replication to FoundationDB, and a hydrate-on-open step to rebuild
+the local file after a handoff. That design needs a flush, because a handoff must wait for the
+replicator to catch up.
+
+The two cannot both be right. One says the file does not exist; the other builds replication
+and hydration around it.
+
+`CLAUDE.md` is the authority and `fabric-store-plane` is the implementation, so **the moduledoc
+is stale**. It also explains the shape of what #96 deleted: `Store.Replicated` and its
+`Replicator` were building the moduledoc's design, and the deletion note says they replicated
+logical key and value rows rather than WAL frames, which is a bug in a design that should not
+have been there.
+
+So the answer to "rebuild what #96 deleted" is **no**. What it deleted was an implementation
+of a superseded design, and the store this project actually wants already exists in another
+repository with a proof beside it.
+
+That is worth more than the eleven milliseconds. An hour of work was about to go into a
+component the architecture had already replaced, and the only thing that caught it was reading
+the implementation instead of the moduledoc that described it.

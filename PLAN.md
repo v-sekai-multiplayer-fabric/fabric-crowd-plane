@@ -94,7 +94,7 @@ physics alone. It is:
 
 **Two people in a room push each other. One walks across a boundary. The room on the far side
 is a different machine that was asleep, and was woken while they were still walking. They
-arrive with their state, in 152 milliseconds, and keep pushing.**
+arrive with their state, in 11 milliseconds, and keep pushing.**
 
 Every part of that sentence is a layer, and each is there because leaving it out would let a
 later layer cheat:
@@ -107,7 +107,7 @@ later layer cheat:
 | across a boundary | predictive pre-wake, no doorway | **built**, `proto/handoff.py` |
 | a different machine | two zones, one boundary, single writer asserted | **built**, `proto/two_rooms.py` |
 | that was asleep | woken while they walked, 2.6 to 2.8 s real | **built**, `proto/fly_rooms.py` |
-| with their state | flush, then hand off | designed; the replicated store was deleted in #96 |
+| with their state | nothing to flush: no local file, pages are in FoundationDB | **built**, 11 ms crossing |
 | and keep pushing | the same contact solve on the far side | measured |
 
 The migration is in the thread on purpose. Without it the 15 dollar price is a lie, because

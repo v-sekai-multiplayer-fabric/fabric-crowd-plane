@@ -18,7 +18,16 @@ import asyncio, math, os, time
 from dataclasses import dataclass, field
 
 WAKE_S = float(os.environ.get("WAKE_S", "3.4"))      # measured, stopped machine to first tick
-FLUSH_S = float(os.environ.get("FLUSH_S", "0.15"))   # a planned flush, not a crash
+# There is nothing to flush. `CLAUDE.md` and `fabric-store-plane/prove_handoff.c` both say an
+# actor has no local database file: SQLite runs over a VFS whose pages are in FoundationDB,
+# and `PRAGMA journal_mode=MEMORY` stops it writing a journal. So a commit is already durable
+# and already visible to any other machine, and a handoff is a close and an open.
+#
+# What remains is the open on the far side: one FoundationDB read path, over the network.
+# A synchronous FoundationDB transaction was measured at about 1.9 ms in
+# `docs/logbook/store_plane.md`, so this is a few milliseconds rather than the 150 an earlier
+# draft assumed for a flush that does not exist.
+OPEN_S = float(os.environ.get("OPEN_S", "0.005"))
 SAFETY = float(os.environ.get("SAFETY", "1.5"))      # wake this many times earlier than needed
 SCALE = float(os.environ.get("SCALE", "10"))         # run the demo faster than real time
 V_MAX_UM_TICK = 500_000                              # lean-entity-packet, PBVH_V_MAX_PHYSICAL
@@ -65,7 +74,7 @@ class Placer:
 
     def __init__(self, wake=None, flush=None):
         self.wake = wake or self._sleep_wake
-        self.flush = flush or self._sleep_flush
+        self.flush = flush or self._sleep_flush     # "flush" is really "open on the far side"
         self.ready = {}          # room -> asyncio.Task, started early
         self.log = []
 
@@ -73,7 +82,7 @@ class Placer:
         await asyncio.sleep(WAKE_S / SCALE)
 
     async def _sleep_flush(self, eid):
-        await asyncio.sleep(FLUSH_S / SCALE)
+        await asyncio.sleep(OPEN_S / SCALE)
 
     def note(self, t0, what):
         self.log.append((time.perf_counter() - t0, what))
@@ -104,7 +113,7 @@ class Placer:
 
 
 async def main():
-    print(f"wake {WAKE_S}s, flush {FLUSH_S}s, horizon {WAKE_S*SAFETY:.1f}s "
+    print(f"wake {WAKE_S}s, open {OPEN_S*1000:.0f}ms, horizon {WAKE_S*SAFETY:.1f}s "
           f"(vMax {V_MAX_UM_TICK/1e6*SIM_HZ:.0f} m/s is the hard bound)")
     print(f"times below are simulated seconds; the demo runs {SCALE:.0f}x faster than real")
     print()
