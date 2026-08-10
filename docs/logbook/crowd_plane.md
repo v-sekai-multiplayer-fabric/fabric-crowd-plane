@@ -358,3 +358,55 @@ The next measurement is not an optimisation. It is a balance controller. These b
 falling over, and a heap of ragdolls is the worst contact case there is. A standing crowd
 touches at the shoulders. Whether the ceiling is 90 or 500 depends on that number, and it
 does not exist yet.
+
+## The stance controller, which does not work yet
+
+`bench/stance.py`. The bodies in the entry above have no controller, so they lie in a heap,
+and a heap is not a crowd. A controller was needed before the ceiling meant anything.
+
+An early draft pulled each root toward its waist tracker. That is cheap, robust, and assumes
+a headset. Most bodies in a crowd are unattended, so it was thrown away. What is needed is a
+body that stands on its own feet with nothing to hold on to.
+
+Two faults in the model had to go first, and both were the model rather than the controller.
+
+The feet were capsules, `fromto` with a radius, which is a line contact. A body cannot
+balance on two lines. They are boxes now, 0.23 by 0.09 metres, and the sole is the base of
+support the ankle strategy works against.
+
+The actuators were 150 Nm. A 69.7 kg body needs about 275 Nm at the hip to hold its own
+torso out at a 0.4 metre lever, so no controller could have stood it up. They are 300 Nm now,
+derived from that figure.
+
+With both fixed, and PD to a stance pose plus a linear-inverted-pendulum ankle strategy in
+both the sagittal and frontal planes, a single body still does not hold a stance. It falls
+in about five seconds, gets itself back up at around twenty, and falls again by thirty. The
+gains are derived rather than guessed, so this is not a tuning failure. Standing balance for
+a 27 degree of freedom humanoid needs a whole-body controller, a stepping strategy, or a
+learned policy, and none of those is a gain.
+
+## What a standing crowd costs, measured around the missing controller
+
+Desk. Roots pinned upright each frame so the bodies stand, limbs still physical, contact
+still solved between people. This measures the crowd the controller is supposed to produce,
+without waiting for it.
+
+| avatars | spacing | us/frame | p99 us | person-person | load at p99 |
+| --- | --- | --- | --- | --- | --- |
+| 100 | 0.75 m | 3055 | 4311 | 28.5 | 0.26 |
+| 200 | 0.75 m | 6394 | 7648 | 58.8 | 0.46 |
+| 400 | 0.75 m | 13834 | 16542 | 119.5 | 0.99 |
+| 200 | 0.60 m | 8052 | 9573 | 156.1 | 0.57 |
+
+A standing crowd is about twice as cheap as a fallen one, and it touches far less: 28
+person-to-person contacts at 100 standing against 277 at 100 collapsed. Both numbers are
+real. A crowd standing at arm's length barely touches, and the touching only starts when it
+packs to 0.6 metres.
+
+So the ceiling is about 400 on the desk at a full tick, about 200 with half the tick left
+for everything else, and about 120 to 150 of those on Fly. That is above the 80 this
+competes with and well under the 500 this logbook assumed for most of its length.
+
+The pin is a cheat and it has to go. A pinned root cannot be pushed, and being pushed is the
+entire product. The number above is what the crowd costs once a stance controller exists.
+Until then there is standing or there is touching, and not both.
