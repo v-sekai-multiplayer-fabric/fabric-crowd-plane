@@ -14,11 +14,16 @@ rendering happens on the player's machine, in client.py.
 """
 import asyncio, json, math, os, struct, sys, time
 
+import zstandard as zstd
+
 import mujoco
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bench"))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "bench"))
+sys.path.insert(0, HERE)
 from touchable import venue
+from entity_packet import Packet, SIZE
 
 TICK = 1.0 / 60
 PUBLISH_EVERY = 3                    # 20 Hz on the wire
@@ -26,6 +31,7 @@ N = int(os.environ.get("BODIES", "60"))
 SPACING = float(os.environ.get("SPACING", "0.9"))
 PUSH = float(os.environ.get("PUSH", "1200"))
 PORT = int(os.environ.get("PORT", "8770"))
+CLASS_SKELETON_JOINT = 2       # the class field says how to read the packet
 
 
 class Room:
@@ -38,6 +44,10 @@ class Room:
                                if self.m.body_parentid[b] == 0])
         self.geoms = np.array([g for g in range(self.m.ngeom)
                                if self.m.geom_bodyid[g] != 0])
+        self.nq = self.m.nq // n
+        self.nu_each = self.m.nu // n
+        self.jrange = [(float(self.m.jnt_range[1 + j, 0]), float(self.m.jnt_range[1 + j, 1]))
+                       for j in range(self.nu_each)]
         self.free = set(range(n))
         self.owner = {}
         for _ in range(40):
@@ -64,22 +74,69 @@ class Room:
         mujoco.mj_step(self.m, self.d)
 
     def geometry(self):
-        """Sent once. The client needs shapes to draw; the plane never draws them."""
-        out = []
-        for g in self.geoms:
-            out.append({"t": int(self.m.geom_type[g]),
-                        "size": [float(x) for x in self.m.geom_size[g][:3]]})
-        return {"n": self.n, "geoms": out}
+        """Sent once: the skeleton the client needs to turn muscles back into positions.
 
-    def frame(self):
-        """Poses on the wire: position in millimetres as int16, orientation as int16 quat."""
-        pos = self.d.geom_xpos[self.geoms]
-        out = bytearray(struct.pack("<H", len(self.geoms)))
-        q = np.empty(4)
-        for k, g in enumerate(self.geoms):
-            out += struct.pack("<hhh", *(int(np.clip(v * 1000, -32000, 32000)) for v in pos[k]))
-            mujoco.mju_mat2Quat(q, self.d.geom_xmat[g])
-            out += struct.pack("<hhhh", *(int(np.clip(v * 32767, -32767, 32767)) for v in q))
+        Shapes, bone offsets, and the parent of each body. The plane draws nothing; it says
+        what a body is shaped like and then only ever sends how it is bent.
+        """
+        nb = (self.m.nbody - 1) // self.n            # bodies in one avatar
+        bodies = []
+        for b in range(1, nb + 1):
+            # which muscle bends this body relative to its parent, and about which axis
+            mus, axis = -1, [0.0, 0.0, 1.0]
+            for j in range(self.m.njnt):
+                if self.m.jnt_bodyid[j] == b and self.m.jnt_type[j] == mujoco.mjtJoint.mjJNT_HINGE:
+                    for a in range(self.nu_each):
+                        if self.m.actuator_trnid[a, 0] == j:
+                            mus = a; axis = [float(x) for x in self.m.jnt_axis[j]]
+                            break
+                    break
+            bodies.append({
+                "parent": int(self.m.body_parentid[b]),
+                "pos": [float(x) for x in self.m.body_pos[b]],
+                "muscle": mus,
+                "axis": axis,
+            })
+        geoms = []
+        for g in range(self.m.ngeom):
+            b = int(self.m.geom_bodyid[g])
+            if b == 0 or b > nb:
+                continue
+            geoms.append({"body": b, "t": int(self.m.geom_type[g]),
+                          "size": [float(x) for x in self.m.geom_size[g][:3]],
+                          "pos": [float(x) for x in self.m.geom_pos[g]],
+                          "quat": [float(x) for x in self.m.geom_quat[g]]})
+        return {"n": self.n, "muscles": self.nu_each, "packet_size": SIZE,
+                "jrange": self.jrange, "bodies": bodies, "geoms": geoms}
+
+    def frame(self, frame_no):
+        """The fabric wire: one XRGridEntityPacket for each joint entity.
+
+        The rotation field carries muscle values, which are swing-twist by another name and
+        are what this project sends. The position field is present because the schema has it,
+        and it is derived rather than transmitted for every joint but the root: it is held
+        constant, so it delta-codes to nothing and the client reconstructs each joint from its
+        parent and a static bone length. See docs/logbook/wire.md.
+        """
+        out = bytearray(struct.pack("<HI", self.n, frame_no))
+        q = self.d.qpos
+        for i in range(self.n):
+            base = i * self.nq
+            root_um = tuple(int(np.clip(q[base + k] * 1e6, -2**62, 2**62)) for k in range(3))
+            for j in range(self.nu_each):
+                a = q[base + 7 + j]
+                lo, hi = self.jrange[j]
+                norm = 0.0 if hi <= lo else (a - lo) / (hi - lo) * 2.0 - 1.0
+                v = int(np.clip(norm * 32767, -32767, 32767))
+                out += Packet(
+                    gid=(i << 16) | j,
+                    pos_um=root_um if j == 0 else (0, 0, 0),   # derived for every joint but the root
+                    vel=(0, 0, 0),
+                    hlc=(frame_no << 8),
+                    class_owner=(CLASS_SKELETON_JOINT << 24) | (i & 0xFFFFFF),
+                    sub_index=j,
+                    rot=(v, 0, 0),                             # one muscle for each hinge here
+                ).encode()
         return bytes(out)
 
     def cross_contacts(self):
@@ -117,13 +174,25 @@ async def main():
         finally:
             room.release(cid); clients.pop(cid, None); drives.pop(cid, None)
 
+    # The packets are the schema; the compression is the transport. A frame is delta-coded
+    # against the previous one and then compressed, which is where the redundancy the packet
+    # deliberately leaves in gets taken back. See docs/logbook/wire.md.
+    comp = zstd.ZstdCompressor(level=1)
+
     async def loop():
         i, t0, sent = 0, time.perf_counter(), 0
+        prev = None
         while True:
             room.step(drives)
             i += 1
             if i % PUBLISH_EVERY == 0 and clients:
-                buf = room.frame()
+                raw = room.frame(i // PUBLISH_EVERY)
+                if prev is not None and len(prev) == len(raw):
+                    d = bytes(a ^ b for a, b in zip(raw, prev))     # delta against last frame
+                    buf = b"\x01" + comp.compress(d)
+                else:
+                    buf = b"\x00" + comp.compress(raw)
+                prev = raw
                 sent += len(buf) * len(clients)
                 await asyncio.gather(*[c.send(buf) for c in list(clients.values())],
                                      return_exceptions=True)
