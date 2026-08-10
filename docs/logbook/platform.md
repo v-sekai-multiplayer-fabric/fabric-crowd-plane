@@ -122,3 +122,62 @@ above should be read as a ceiling that is never reached.
 The load ratio in `spec/CrowdBudget.lean` is what makes this safe without a constant. This
 entry is why it is needed: the number that was wrong was not the body cost. It was the
 belief that a measured body cost predicts a loop.
+
+## Gamend, and why it is not a competitor
+
+`https://appsinacup.com/gamend-stress-test/`. A game backend stress-tested to 4000 concurrent
+connections, about 3000 requests a second, on 4 vCPU and 1 GB for 8 dollars a month, in
+Elixir over SQLite or Postgres. 99.98 percent success. p99 latency **15 seconds**.
+
+Reading it as a rival to this plane would be a category error, and the differences are the
+useful part.
+
+| | Gamend | this |
+| --- | --- | --- |
+| simulates | account writes and user data reads | 60 Hz rigid-body physics |
+| concurrency | 4000 connections | 120 to 150 bodies |
+| work for each unit | about one request, bursty | 55 microseconds every 16.7 ms, forever |
+| p99 latency | 15 seconds | 16.7 milliseconds |
+| hardware | 4 vCPU, 1 GB | 2 vCPU, 4 GB, dedicated |
+| cost | 8 dollars a month | 15 |
+| admission control | a hard cap of 1000 connections | tick load p99 under 1, and a person-hour budget |
+
+**It is the layer this design calls the control plane and the store plane.** Accounts,
+persistence, and user data are exactly what weft needs and does not have, and Gamend does
+them at 4000 connections for 8 dollars. The two compose rather than compete: one holds who
+you are, the other holds where your body is this millisecond.
+
+### The number that matters, and it is the latency
+
+A p99 of 15 seconds is not a criticism. For account creation it is fine, because nobody
+notices a slow signup and the work is bursty enough that queueing is the right answer.
+
+For a shove it is fatal, and the gap is **three orders of magnitude**. That single row is why
+the two systems cannot share a machine class, and it explains the price difference below
+better than any other line.
+
+### The price difference is the deadline
+
+Gamend gets 4 vCPU for 8 dollars, which is about 2 dollars a vCPU. This design assumes 31
+dollars, which is 7.75 times more. That gap looked like a mistake in the cost model and it is
+not: their vCPUs are shared and mine are dedicated. A shared vCPU is scheduled against other
+tenants, which produces exactly the tail that a 15-second p99 absorbs and a 16.7 millisecond
+tick cannot.
+
+`platform.md` already measured what that tail does here: 237 milliseconds of hypervisor
+deschedule at p99 on a machine that was only 99 percent loaded, and 25 percent variance
+between two machines of the same size in the same region. On dedicated cores. Shared would be
+worse.
+
+So the honest reading of the 7.75 times is not that the cost model is pessimistic. It is that
+**a real-time deadline costs about eight times as much per core as a request-response
+workload**, and any comparison of dollars between the two has to carry that.
+
+### What is worth stealing
+
+Their hard cap of 1000 simultaneous connections is admission control, arrived at from the
+same direction as the tick-load gate here: a system that degrades instead of refusing will
+degrade for everybody. Their write-up also records that 256 MB ran out of memory and that
+database timeouts dominated until caching went in, which is the same shape as this logbook
+finding that the microbenchmark stopped being true inside a loop. Both are the difference
+between measuring a component and running a system.
