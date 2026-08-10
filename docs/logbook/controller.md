@@ -384,3 +384,36 @@ The plane gains a second input path that bypasses the controller entirely, and t
 a channel that is not joint rotations and does not compress like them. Neither is costed in
 `wire.md`, which measures body pose only, and both should be before the topology is called
 settled.
+
+## RESULT: H2 works, and the criterion written for it was the wrong one
+
+Same 500 iterations, same motion set, discriminator learning rate 1e-4 to 1e-5 and gradient
+penalty 5.0 to 10.0. End-of-run values:
+
+| series | baseline | H2 | |
+| --- | --- | --- | --- |
+| `info/episode_reward` | 30.6 | **128.9** | 4.2 times |
+| `env/total_env_reward_mean` | 0.415 | **0.463** | first movement in this series at all |
+| `rewards/unnormalized_amp_rewards` | 0.133 | 0.183 | stopped collapsing |
+| `discriminator/agent_acc` | 0.947 | 0.892 | slightly less certain |
+| `discriminator/pos_acc` | 1.000 | **0.999** | did not move |
+
+The prediction was that `pos_acc` would fall into the 0.7 to 0.9 band, and it did not. By the
+criterion written down in advance, H2 fails.
+
+By outcome it plainly works. Episode reward went up 4.2 times and the task reward moved for
+the first time across two runs. So the hypothesis was right and **the proxy chosen to test it
+was wrong**: a discriminator can still classify expert motion perfectly while leaving the
+policy a usable gradient, because what matters is the slope it presents, not the accuracy it
+reaches. `unnormalized_amp_rewards` turning from falling to rising was the honest indicator
+and it was in the table all along, one row down.
+
+Worth keeping because the next hypothesis will need a criterion too, and the lesson is to pick
+the one nearest the outcome rather than the one nearest the mechanism.
+
+### What it does not settle
+
+Episode reward was still climbing at the end, 106.6 at the midpoint and 128.9 at the finish,
+so 500 iterations stopped the run rather than finished it. That makes H3 the next test, and it
+is now a different question from the one first written: not "does more training rescue a dead
+run", but "how far does a run that is already learning go".
