@@ -395,3 +395,70 @@ test:** free, since it is read off the runs done for the others.
 H2 first because it is one flag and 20 minutes. H3 second because it is only time. H1 last
 because it is a retargeting pipeline, and because if H2 fixes the gradient then H1 becomes a
 question about which motions rather than whether there are any.
+
+## Hypotheses for making inference cheap enough to feel like a console
+
+The target is not a percentage. It is that a shove reads as instant. A console character
+controller answers the stick within one or two frames, so **16 to 33 milliseconds is the bar**,
+and any saving bought with latency is spending the thing being sold.
+
+That immediately demotes the cheapest lever measured so far. Running control at 20 Hz for
+everybody is 3 times cheaper and puts 50 milliseconds between a shove and a reaction, which
+is worse than a console and worse than what a player notices.
+
+### I1: narrow the network
+
+1024x512 to 256x128 is 2.4 times, MEASURED, and costs no latency at all. **Prediction:** a
+steering policy on flat ground does not need the width chosen for tracking all of AMASS.
+**Falsified if** the narrow policy will not learn the task, which is a training question and
+not an inference one.
+
+### I2: control-rate level of detail, near at 60 Hz and far at 20
+
+The idea the rest of this design already uses, applied to thinking instead of to bytes. A
+body you can reach must answer in one frame. A body across the room can think at 20 Hz and
+nobody can tell, because you cannot push it.
+
+| near at 60 Hz | far at 20 Hz | us/frame | share of tick | worst latency for anyone reachable |
+| --- | --- | --- | --- | --- |
+| 150 | 0 | 6506 | 39.0 percent | 16.7 ms |
+| 30 | 120 | 3036 | 18.2 | 16.7 ms |
+| 10 | 140 | 2458 | 14.7 | 16.7 ms |
+| uniform 20 Hz | | 2169 | 13.0 | **50 ms for everyone** |
+
+Ten near at full rate costs 14.7 percent against 13.0 for the uniform version. **Four tenths
+of one percent of a tick buys back console latency for every body a player can touch.** That
+is the whole argument. **Prediction:** interest radius already decides who is near, so this
+needs no new mechanism. **Falsified if** switching a body between rates makes its motion jump,
+which is a real risk and the reason to measure it rather than assume it.
+
+### I3: int8 through VNNI
+
+Maybe 4 times, and unverified because the Fly host reports only "AMD EPYC" with no model. Zen
+4 has AVX-512 VNNI and Zen 3 does not. **Cost to test:** one command on a Fly machine to read
+`/proc/cpuinfo`, which should have been done already. No latency cost. **Falsified if** the
+target is Zen 3, in which case int8 buys almost nothing.
+
+### I4: distil a wide policy into a narrow one
+
+I1 costs capacity during training. Training wide and distilling into 256x128 for deployment
+recovers it, because imitating a working policy is a much easier problem than discovering
+one. **Prediction:** a distilled narrow policy beats a narrow policy trained from scratch.
+**Cost to test:** a second training stage, cheap next to the first.
+
+### I5: framework overhead
+
+Every number above is numpy through BLAS, which is close to what a tuned C++ plane would
+reach. onnxruntime adds a graph, and a graph has per-call overhead that matters when the call
+is 43 microseconds. **Prediction:** onnxruntime lands within 20 percent of raw BLAS for this
+shape, and if it does not, the plane should call a GEMM directly and skip the runtime.
+**Cost to test:** one benchmark, not yet run.
+
+### What is not on this list
+
+Four-bit weights, for the reason in the entry above: the actor is cache-resident, so the
+problem is arithmetic and not bytes, and no CPU multiplies four-bit numbers.
+
+Running the policy on a separate machine. It costs 41.68 dollars a month against a 15 dollar
+ceiling, it is the cross-machine per-tick path weft forbids, and it puts a network hop inside
+a deadline that already loses 237 milliseconds to the hypervisor at p99.
