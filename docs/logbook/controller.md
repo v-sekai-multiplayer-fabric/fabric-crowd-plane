@@ -335,3 +335,63 @@ The first two multiply to about 7 times and take the policy from 94 percent of a
 They are also the two that cost something real: a narrow policy may not learn the task, and a
 policy thinking at 20 Hz reacts late to a shove, which is the one thing this product sells.
 Quantisation costs accuracy instead, which is a different currency and a smaller bill.
+
+## What the first run actually did, and four hypotheses about why
+
+500 iterations finished on time and did not learn. The curves say so plainly.
+
+| series | start | quarter | half | three quarters | end |
+| --- | --- | --- | --- | --- | --- |
+| `env/total_env_reward_mean` | 0.396 | 0.413 | 0.408 | 0.411 | 0.415 |
+| `info/episode_reward` | 13.1 | 59.4 | 46.6 | 23.1 | 30.6 |
+| `rewards/unnormalized_amp_rewards` | 0.594 | 0.104 | 0.159 | 0.172 | 0.133 |
+| `discriminator/pos_acc` | 0.995 | 1.000 | 1.000 | 1.000 | 1.000 |
+| `discriminator/agent_acc` | 0.994 | 0.939 | — | — | 0.947 |
+
+The task reward is **flat**: 0.396 to 0.415 across 500 iterations, which is noise. Episode
+reward rises to 59 and falls back to 30, so whatever it found it then lost.
+
+The discriminator is the loud signal. It classifies expert motion perfectly and agent motion
+at about 95 percent, and it does so from the first epochs. That is the classic adversarial
+failure: once the discriminator separates the two distributions completely, the AMP reward
+carries almost no gradient, and the unnormalised AMP reward falling from 0.594 to 0.133 is
+that happening.
+
+### H1: the reference motion is wrong for the task
+
+`soma23_bones_seed_mini.pt` is a mini subset shipped to smoke-test the motion tracker. AMP
+teaches a policy to move like its reference data, so if that subset is not locomotion, no
+amount of training produces walking. **Prediction:** a locomotion-rich reference set moves
+`unnormalized_amp_rewards` up rather than down, and `discriminator/pos_acc` off 1.000.
+**Cost to test:** retargeting Mixamo's 2457 clips to SOMA-23, which is a pipeline, not a flag.
+
+### H2: the discriminator is too strong
+
+`pos_acc` pinned at 1.000 from the start means the policy never receives a usable gradient.
+The standard remedies are a lower discriminator learning rate, a heavier gradient penalty, or
+fewer discriminator updates per policy update. **Prediction:** weakening it moves `pos_acc`
+into the 0.7 to 0.9 band and `unnormalized_amp_rewards` stops falling. **Cost to test:** one
+override and a 20 minute run. This is the cheapest test and the evidence for it is the
+strongest, so it goes first.
+
+### H3: 500 iterations is far too few
+
+500 was chosen as "enough to see whether it learns", with nothing behind it. AMP locomotion
+in the literature runs to thousands. **Prediction:** if H2 and H1 are the real faults, more
+iterations of the current setup changes nothing, and the flat task reward stays flat. **Cost
+to test:** about 4 minutes for each 100 iterations, so 3000 is roughly 2 hours.
+
+### H4: the task reward is being normalised into nothing
+
+`reward_norm/var` sits between 197 and 249, so the raw task reward of about 0.41 is divided
+down to 0.027. The AMP reward post-normalisation is 0.028, which is the same size. If the
+normaliser is scaling a nearly constant task reward against a collapsing AMP reward, the
+policy sees two small numbers and no clear direction. **Prediction:** the flat task reward is
+the cause rather than the symptom, and it stays flat under H2 and H3 as well. **Cost to
+test:** free, since it is read off the runs done for the others.
+
+### The order
+
+H2 first because it is one flag and 20 minutes. H3 second because it is only time. H1 last
+because it is a retargeting pipeline, and because if H2 fixes the gradient then H1 becomes a
+question about which motions rather than whether there are any.
