@@ -77,3 +77,44 @@ a linear latent has nothing to take.
 
 The set cannot answer the temporal question, which is where every gain has come from.
 Consecutive rows are 30 degrees apart, so it holds a pose distribution and not a motion.
+
+## The org already specified the wire, and this book reinvented it
+
+`lean-entity-packet` is the source of truth: `XRGridEntityPacket`, 100 bytes, fully integral
+so it models exactly in Lean, with Plausible roundtrip properties, a `packet_golden.csv` of
+canonical bytes, and a C++ decoder differentially verified against 64 golden vectors.
+
+| offset | field | encoding |
+| --- | --- | --- |
+| 0 | global_id | u32 |
+| 4 | position xyz | int64 absolute micrometres |
+| 28 | velocity xyz | i16 scaled to V_MAX |
+| 40 | hlc | u32, frame shifted 8 with counter |
+| 44 | class and owner | u32 |
+| 48 | sub_index | u32 |
+| 52 | rotation | i16 swing-twist x3 |
+| 58 | payload | 42 bytes |
+
+Alongside it, `lean-interest-mgmt` specifies who sees whom and the solve order, and
+`lean-fabric-protocol` holds the saturation and SLA bounds. None of these were read before
+this book measured a wire format from scratch.
+
+### Reconciling 100 bytes with 21
+
+The crowd plan puts one entity on each joint, so a body is 27 packets, which is 2700 bytes.
+This book measured 21 bytes for a body. That is 128 times apart and it is not a
+contradiction: **the packet is the schema and the compression is the transport.**
+
+Everything the 21-byte measurement exploits is redundancy the packet deliberately leaves in.
+Position is an absolute int64 micrometre coordinate that changes by a few hundred
+micrometres between frames. The HLC increments by one. Class, owner, and sub-index never
+change. The payload is constant for a joint. Delta between frames plus an entropy coder takes
+all of it, which is exactly what `wire.md` measured, and none of it requires a different
+format on the wire.
+
+So the correct prototype emits `XRGridEntityPacket` and compresses the stream. The invented
+format in `proto/plane.py` is wrong twice over: it is not the org's schema, and it is
+uncompressed.
+
+`packet_golden.csv` is the conformance test, and a C++ decoder already passes it. Anything
+this repository writes should pass it too rather than assert compatibility.
