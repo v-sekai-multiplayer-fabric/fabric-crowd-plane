@@ -864,10 +864,54 @@ theorem muscles_beat_rotations : rotationPackedBytes * 10 / musclePackedBytes = 
    that without long runs to amortise it. Run-length is the right tool for a still crowd, and
    this crowd is in headsets and moving. -/
 
+/- ### A long dictionary of previous frames does not pay
+
+   MEASURED. `bench/wire_dict.py`, 600 frames of 16 bodies, four schemes over the same
+   muscle-space deltas:
+
+     independent frames               75 bytes   any loss is fine
+     static trained dictionary        72         any loss is fine, 110 KiB shipped once
+     keyframe every 20 frames         75         a loss costs a second
+     keyframe every 60 frames         75         a loss costs three seconds
+     streaming, full history          69         needs reliable ordered delivery
+     order-0 entropy coder            53         any loss is fine
+
+   Every dictionary scheme loses to the entropy coder, and the two that come closest are the
+   two that demand the most from delivery. Keyframes gain nothing at all.
+
+   The reason is worth keeping, because it decides the next format question too. A dictionary
+   feeds LZ, and LZ finds repeated substrings. A bit-packed delta stream has none: two frames
+   of a walk are similar in value and share no byte sequence, because the values sit at
+   different offsets and are smeared across byte boundaries. There is nothing to match.
+
+   What is left is redundancy in the symbol distribution, and that is exactly and only what
+   an entropy coder takes. It is also why cheap CBOR compressed well earlier and nasty does
+   not: CBOR repeats its key names every frame, so LZ has something to find. Compressing a
+   good format looks disappointing, and that is the format working.
+
+   This also settles the delivery question in the direction weft already wanted. The scheme
+   that wins is stateless for each frame, so it rides sequenced unreliable WebTransport and a
+   dropped datagram costs one frame rather than desynchronising a decoder. -/
+
 /-- The design number: delta, then an order-0 range coder over the muscle symbols. 53 bytes
     plus a root position. zstd instead of a range coder gives 69 today and needs no new
-    code. -/
+    code, and no dictionary scheme beats it. -/
 def muscleEntropyBytes : Nat := 53
+
+def muscleStreamingBytes : Nat := 69
+def muscleStaticDictBytes : Nat := 72
+def muscleIndependentBytes : Nat := 75
+
+/-- The entropy coder beats full-history streaming by 23 percent while needing none of what
+    streaming needs. -/
+theorem entropy_beats_streaming :
+    (muscleStreamingBytes - muscleEntropyBytes) * 100 / muscleStreamingBytes = 23 := by
+  native_decide
+
+/-- A trained dictionary is worth 4 percent for 110 KiB shipped to every client. -/
+theorem a_trained_dictionary_is_worth_four_percent :
+    (muscleIndependentBytes - muscleStaticDictBytes) * 100 / muscleIndependentBytes = 4 := by
+  native_decide
 
 theorem the_wire_is_sixty_eight_times_smaller :
     joints * packetBytes * 100 / muscleEntropyBytes = 6792 := by native_decide
