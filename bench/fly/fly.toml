@@ -1,5 +1,10 @@
-# Benchmark only. No services, no ports, nothing that stays up.
-# A machine is created, it runs once, it is destroyed. See README.md.
+# Benchmark only. A machine is created, it runs once, and it is destroyed.
+#
+# There are no services and no ports, so nothing here can stay up by accident. The venue
+# deployment is a different file and is not written yet; when it is, the three lines that
+# keep it under the cap are `auto_stop_machines`, `min_machines_running = 0`, and a volume
+# small enough that storage cannot break the cap on its own. See spec/CrowdBudget.lean,
+# "The 15 dollar cap".
 app = "weft-crowd-bench"
 primary_region = "sjc"
 

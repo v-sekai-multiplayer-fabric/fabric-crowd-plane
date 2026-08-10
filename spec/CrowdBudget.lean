@@ -1265,6 +1265,104 @@ theorem thirty_seven_times_cheaper_than_where_this_started :
       / (machineTenthCentsPerHeadShipped + egressTenthCentsPerHeadMonthContext) = 372 := by
   native_decide
 
+/- ## The 15 dollar cap, which is a ceiling and not a target
+
+   A hobby plan at 15 dollars a month is a hard limit. That is a different requirement from a
+   cheap design: the system has to be unable to exceed it, not merely priced under it. So the
+   number to derive is not dollars for each head. It is how many person-hours 15 dollars
+   buys, and what refuses service when they are gone.
+
+   Scale to zero turns money into time. A stopped machine bills nothing for compute, so a
+   venue that runs only when occupied converts the whole budget into occupancy.
+
+   ### What accrues whether or not anybody is present
+
+   This is the part a cap must pin down first, because it cannot be refused.
+
+     1 GB volume for FoundationDB     0.15 dollars a month
+     shared IPv4 and IPv6             free
+     a stopped machine                free
+     the app itself                   free
+
+   So the floor is 15 cents and 14.85 dollars is spendable. A 300 GB volume would have been
+   45 dollars and would have broken the cap on its own, with nobody logged in. Storage is the
+   only line item here that cannot be switched off, which makes it the only one that has to
+   be small by construction. -/
+
+/-- Millionths of a dollar throughout this section. The marginal cost of a person-hour is
+    about a tenth of a cent, so cents would round it away and tenths of a cent nearly would. -/
+def capMicroDollars : Nat := 15000000
+
+/-- What accrues with nobody present: a 1 GB volume. -/
+def fixedMicroDollarsPerMonth : Nat := 150000
+
+def spendableMicroDollars : Nat := capMicroDollars - fixedMicroDollarsPerMonth
+
+/-- Marginal cost of one person for one hour. A performance-2x holds 301 people on the
+    platform, and its machine-hour spread over them is 379 millionths. The wire at 10800
+    bytes a second is 778. -/
+def machineMicroDollarsPerPersonHour : Nat := 379
+def wireMicroDollarsPerPersonHour : Nat := 778
+def marginalMicroDollarsPerPersonHour : Nat :=
+  machineMicroDollarsPerPersonHour + wireMicroDollarsPerPersonHour
+
+/-- The wire is two thirds of the marginal cost. With the machine running only when the venue
+    is occupied, it is well used, and egress dominates again. That is the reverse of the
+    always-on case, where the machine ran empty most of the month and was 93 percent of it. -/
+theorem the_wire_is_two_thirds_of_the_margin :
+    wireMicroDollarsPerPersonHour * 100 / marginalMicroDollarsPerPersonHour = 67 := by
+  native_decide
+
+/-- THE CAP, AS PERSON-HOURS. This is the quantity the control plane meters. -/
+def personHourBudget : Nat :=
+  spendableMicroDollars / marginalMicroDollarsPerPersonHour
+
+theorem the_cap_is_12834_person_hours :
+    personHourBudget = 12834 := by native_decide
+
+def hoursInMonth : Nat := 730
+
+/-- 17 people online continuously, or 301 for 42 hours in the month. -/
+theorem seventeen_people_always_on : personHourBudget / hoursInMonth = 17 := by native_decide
+theorem or_a_full_venue_for_42_hours :
+    personHourBudget / peopleAt flyBodyP90Ns 1 = 42 := by native_decide
+
+/- ### The wire is the lever, again
+
+   Two thirds of the margin is egress, so the cap moves with the wire and barely with
+   anything else. Cutting the far bodies from 5 Hz to 2, and the near set from ten bodies to
+   four, takes 10800 bytes a second to 3480 and nearly doubles what 15 dollars buys. -/
+
+def aggressiveWireMicroDollars : Nat := 251
+def aggressiveBudget : Nat :=
+  spendableMicroDollars / (machineMicroDollarsPerPersonHour + aggressiveWireMicroDollars)
+
+theorem cutting_the_wire_nearly_doubles_the_cap :
+    aggressiveBudget = 23571 := by native_decide
+
+theorem thirty_two_always_on : aggressiveBudget / hoursInMonth = 32 := by native_decide
+
+/- ### What enforces it
+
+   A budget is not a cap until something refuses. Three mechanisms, in the order they bite:
+
+   1. The machine stops whenever the venue is empty. Fly does this with
+      `auto_stop_machines` and `min_machines_running = 0`, so idle time costs nothing and
+      no operator has to remember.
+   2. The control plane meters person-seconds against `personHourBudget` and stops admitting
+      at 90 percent of it. weft already holds admission, because it is the control plane and
+      it places actors.
+   3. At 100 percent the venue stops. This is the one that must exist even though nobody
+      wants it to fire, because a cap that only warns is a target.
+
+   The volume is sized once and cannot grow on its own, which is why it is the first item
+   above and not the last. -/
+
+def admissionStopsAt : Nat := personHourBudget * 90 / 100
+
+theorem admission_stops_with_a_tenth_left :
+    personHourBudget - admissionStopsAt = 1284 := by native_decide
+
 /- ### The machine, and the bill, after all of it -/
 
 /-- The edge no longer carries 6.9 gigabits, so it no longer needs four cores. Two. -/
