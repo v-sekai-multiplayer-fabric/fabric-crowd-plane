@@ -61,14 +61,17 @@ freedom humanoid is a real problem and not a gain to tune.
 
 ## The speedrun, in order
 
-1. **A controller that stands and takes a stick.** Three routes, and they differ in kind:
-   - *Kinematic root, physical limbs, soft spring.* Fastest to a demo. The root follows the
-     player's intent, the limbs are physical, a push displaces and the spring recovers. It is
-     not balance, and it is what games actually ship.
-   - *ProtoMotions on Newton, trained here on the 4090.* The right answer, ours, matching our
-     simulator. Blocked today on an upstream Warp codegen bug in `mujoco_warp`.
+1. **A controller that stands and takes a stick.** It is learned. Two routes:
+   - *ProtoMotions on Newton, trained here on the 4090.* The right answer: ours, and it
+     matches the simulator we run. Blocked today on an upstream Warp codegen bug in
+     `mujoco_warp`, which is a one-line fix in their solver kernel.
    - *ProtoMotions on IsaacLab with NVIDIA's weights.* Works immediately, large install, and
      a policy trained in a simulator we do not run is a policy we cannot change.
+
+   A kinematic root with physical limbs was considered and is **rejected**. It is what games
+   ship and it is faster to a demo, and a kinematic root cannot be pushed. Being pushed is
+   the feature, so the shortcut deletes the product. This is the same objection that makes
+   the pinned-root measurement in the logbook a cheat rather than a result.
 2. **A venue**: floor, walls, one doorway.
 3. **The publish path**: joint entities onto the ring at 20 Hz in muscle space.
 4. **One machine on Fly**, scale to zero, admission on measured tick load and on the
