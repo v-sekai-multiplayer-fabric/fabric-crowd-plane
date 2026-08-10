@@ -1103,6 +1103,34 @@ theorem per_cell_encoding_is_430_times_less :
    much safer along the way: it was sized for 6.9 gigabits when the wire carried positions,
    and it carries 86 megabits now. -/
 
+/- ### Two cores would be half the bill, and the solver will not pay for it
+
+   The crowd plane takes 3 vCPU because 2 holds 974 and a thousand is a thousand. 26 people.
+   Shaving 3 percent off a body would close it, and the machine below would drop from 8 vCPU
+   to 4.
+
+   MEASURED, and it does not work. `bench/solver_iterations.py`, deepest contact penetration
+   over 1200 driven frames:
+
+     10 iterations   26.09 us   90 millimetres      1065 people on two cores
+      4 iterations   25.82 us   133 millimetres     1075
+      2 iterations   24.13 us   130 METRES          1136
+      1 iteration    17.36 us   960 metres          1478
+
+   Below four the contact solve stops converging and bodies pass through the floor and each
+   other. Nothing is reported as an error: `qpos` stays finite and the simulation runs, which
+   is the part worth remembering. The failure is silent and only a penetration check finds
+   it.
+
+   This is the same measurement that said iterations were free on the musculoskeletal body,
+   and it said that because a barely-touching body has nothing to solve. A crowd pressing
+   together does. The earlier result was true and did not generalise. -/
+
+def iterationsFloor : Nat := 4
+
+theorem cutting_iterations_does_not_reach_a_thousand :
+    16666000 / (2433 + (45 + 280 + 25820) / 2) < people := by native_decide
+
 /-- The shipped wire: order-1 context coding, 21 bytes of muscle deltas plus a root position,
     at 20 Hz for the bodies within touching distance. Distant bodies send a root position at
     5 Hz and the client interpolates. -/
