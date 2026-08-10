@@ -20,10 +20,11 @@ TICK_US = 16666
 def venue(n, spacing=0.75, iters=10, islands=True):
     """A room of n avatars in ONE model, so contact between them is solved once.
 
-    The timestep is 8.3 ms and not 16.7. A single body is stable at 16.7 and a crowd in
-    contact is not: at that step the solver loses a metre of penetration, ejects bodies at
-    velocities near 10^7, and goes NaN in about five seconds. Halving it fixes all three.
-    The frame runs two substeps to stay at 60 Hz. See docs/logbook/body.md.
+    The timestep is 16.7 ms and one step runs for one frame. An earlier version halved it
+    and ran two substeps, on the belief that a crowd in contact was unstable at 16.7. That
+    was wrong. The divergence came from a drive that applied a constant force with no speed
+    it settled at, and a body under one accelerates without limit whatever the step is. A
+    smaller step only makes it diverge slower. See docs/logbook/body.md.
     """
     bodies, acts = [], []
     side = max(1, int(np.ceil(np.sqrt(n))))
@@ -49,7 +50,7 @@ def venue(n, spacing=0.75, iters=10, islands=True):
     return ('<mujoco model="venue"><compiler angle="radian"/>'
             '<size memory="512M"/>'
             '<visual><global offwidth="1920" offheight="1080"/></visual>'
-            '<option timestep="0.008333" solver="Newton" iterations="%d">%s</option>'
+            '<option timestep="0.016666" solver="Newton" iterations="%d">%s</option>'
             '<default><geom type="capsule" condim="3" friction="0.9 0.005 0.0001" density="985"/>'
             '<joint type="hinge" damping="2" armature="0.02"/>'
             '<motor ctrlrange="-150 150"/></default>'

@@ -26,11 +26,25 @@ from touchable import venue
 from entity_packet import Packet, SIZE, PACKET_DTYPE, empty as empty_packets
 
 TICK = 1.0 / 60
-SUBSTEPS = 2                   # 8.3 ms physics steps inside a 16.7 ms frame
 PUBLISH_EVERY = 3                    # 20 Hz on the wire
 N = int(os.environ.get("BODIES", "60"))
 SPACING = float(os.environ.get("SPACING", "0.9"))
+# The ceiling on the force a body may use to reach its wanted speed, not the force it
+# always applies. A constant force has no speed it settles at, so a held stick accelerates
+# a body without limit: at 1200 N on 70 kg that is 17 m/s^2, and a minute of it reaches
+# thousands of m/s and takes the solver with it. See docs/logbook/body.md.
 PUSH = float(os.environ.get("PUSH", "1200"))
+# What a body is trying to reach, in metres a second. A person walks at about 1.4 and runs
+# at about 5. The stick magnitude picks a point between them, so this is a speed a body
+# has, not a number that trades one failure against another.
+WALK_SPEED = float(os.environ.get("WALK_SPEED", "1.4"))
+RUN_SPEED = float(os.environ.get("RUN_SPEED", "5.0"))
+
+# The 26 joint motors stay dark, and that is a gap and not a decision. Driving them as a PD
+# servo that holds the rest pose was tried and does not stand: the crowd collapses and is
+# then ejected upward, which reads as standing if a height is sampled at one instant. A PD
+# hold has no term for where the centre of mass is over the feet, so it cannot balance. The
+# motors wait on the trained controller, which does have that term. See docs/logbook/controller.md.
 JUMP = float(os.environ.get("JUMP", "6000"))
 CROUCH = float(os.environ.get("CROUCH", "2500"))
 FACE_TORQUE = float(os.environ.get("FACE_TORQUE", "400"))
@@ -78,6 +92,11 @@ class Room:
         self._jhi = np.array([r[1] for r in self.jrange])
         self.free = set(range(n))
         self.owner = {}
+        # Where each actuator reads its own angle and rate. The controller will need these.
+        trn = self.m.actuator_trnid[:, 0]
+        self.act_qpos = self.m.jnt_qposadr[trn]
+        self.act_qvel = self.m.jnt_dofadr[trn]
+        self.pose = self.d.qpos[self.act_qpos].copy()
         for _ in range(40):
             mujoco.mj_step(self.m, self.d)
 
@@ -103,14 +122,28 @@ class Room:
         learned controller would take them as extra commands rather than as forces.
         """
         self.d.xfrc_applied[:] = 0.0
+
         for cid, cmd in drives.items():
             i = self.owner.get(cid)
             if i is None:
                 continue
             r = self.roots[i]
             mx, my = cmd.get("move", (0.0, 0.0))
-            self.d.xfrc_applied[r, 0] = mx * PUSH
-            self.d.xfrc_applied[r, 1] = my * PUSH
+            mag = math.hypot(mx, my)
+            if mag > 0.0:
+                # Drive toward a speed and stop pushing once the body has it. The stick
+                # magnitude chooses the speed between a walk and a run; the force needed to
+                # close the gap in one tick is capped at PUSH, so a body accelerates hard
+                # and then holds, which is what a character controller does.
+                want_speed = WALK_SPEED + min(mag, 1.0) * (RUN_SPEED - WALK_SPEED)
+                dof = self.m.body_dofadr[r]
+                have = self.d.qvel[dof:dof + 2]
+                want = np.array([mx / mag, my / mag]) * want_speed
+                need = (want - have) * self.m.body_mass[r] / TICK
+                over = np.linalg.norm(need)
+                if over > PUSH:
+                    need *= PUSH / over
+                self.d.xfrc_applied[r, 0:2] = need
             if cmd.get("jump"):
                 self.d.xfrc_applied[r, 2] = JUMP
             if cmd.get("crouch"):
@@ -123,10 +156,10 @@ class Room:
                 have = math.atan2(zaxis[1], zaxis[0])
                 err = (want - have + math.pi) % (2 * math.pi) - math.pi
                 self.d.xfrc_applied[r, 5] = err * FACE_TORQUE
-        # The model steps at 8.3 ms because a crowd in contact is not stable at 16.7, so a
-        # 60 Hz frame is two of them. Stepping once would advance the world at half speed.
-        for _ in range(SUBSTEPS):
-            mujoco.mj_step(self.m, self.d)
+        # One step of 16.7 ms for one frame of 16.7 ms. A crowd in contact is stable here
+        # once the drive targets a speed rather than pushing with a constant force. A
+        # smaller step does not fix an unbounded drive, it only makes it diverge slower.
+        mujoco.mj_step(self.m, self.d)
 
     def geometry(self):
         """Sent once: the skeleton the client needs to turn muscles back into positions.

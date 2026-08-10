@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/tick_test.dir/link.d CMakeFiles/tick_test.dir/test/tick_test.cpp.o -o tick_test

@@ -130,3 +130,63 @@ Capacity falls by 60 percent. The 15 dollar figure falls less, from 80 to 57, be
 is most of that bill and the wire did not change.
 
 The model default is now 8.3 ms with two substeps.
+
+## The crowd was never unstable at 16.7 ms
+
+The teleporting had nothing to do with the timestep. Halving the step and running two
+substeps was the wrong fix, it cost twice the compute, and it did not work.
+
+The drive was the fault. `PUSH` applied a constant 1200 N for as long as a client held the
+stick, with no speed it settles at. A constant force has no equilibrium: 1200 N on 70 kg is
+17 m/s^2, held, so the body accelerates until the solver cannot follow. A held stick is not
+an edge case. It is what a player does.
+
+Both steps under a held stick, 40 bodies, one minute:
+
+| drive | step | deepest | max qvel | top speed | teleports |
+| --- | --- | ---: | ---: | ---: | ---: |
+| constant 1200 N | 16.7 ms x1 | -32128 mm | 1.47e9 | 7539 m/s | 2815 |
+| constant 1200 N | 8.3 ms x2 | -228 mm | 2.86e6 | 3765 m/s | 3048 |
+| velocity-targeted | 16.7 ms x1 | -61 mm | 18.1 | 2.7 m/s | 0 |
+
+The second row is the point. The substep version diverges too. It reaches 3765 m/s instead
+of 7539, so a twelve second clip looks acceptable and a minute does not. A smaller step buys
+time against an unbounded drive, it does not bound it.
+
+The drive now targets a speed and stops pushing once the body has it, with PUSH as the
+ceiling on the force it may use to get there. One step of 16.7 ms for one frame of 16.7 ms.
+
+Two other faults fell out of the same reading. Both planes stepped a 16.7 ms model twice a
+frame, so the world ran at twice real time, not half: `Room.__init__` overrode the XML with
+`opt.timestep = TICK` and the native plane declared 16.666 in its own XML. And the earlier
+armature sweep was measured with `d.ctrl` never assigned, so the 26 actuators produced no
+torque and the derivation from actuator saturation described a term that was not running.
+
+### A pose servo is not a balance controller
+
+Driving the 26 motors as a PD servo holding the rest pose was tried, because a motor is the
+honest way to move a body and a force on the pelvis is not. It does not stand. The crowd
+collapses and is then ejected upward, which reads as standing if height is sampled once at
+the end: mean height ran 0.96, 0.39, 0.34, 0.27, and then 0.99 at fifteen seconds while the
+velocities stayed near 43. A PD hold has no term for where the centre of mass sits over the
+feet, so there is nothing in it that balances. The motors wait on the trained controller.
+
+## Jolt, measured against MuJoCo
+
+Same 14 links, same radii, same box feet, same density, same 0.9 m grid, and the mass agrees
+to the gram: 69.99 kg in both. One core, one collision step, 16.7 ms, worst frame in microseconds.
+
+| bodies | MuJoCo | Jolt |
+| ---: | ---: | ---: |
+| 40 | 2781 | 1937 |
+| 60 | 4143 | 3090 |
+| 80 | 5794 | 3602 |
+| 100 | 5608 | 4886 |
+| 120 | 9083 | 6809 |
+| 200 | - | 10416 |
+| 300 | - | 17341 |
+
+Jolt is faster by about a third to a half on the worst frame, not by the order of magnitude
+the first run suggested. That first run measured a benchmark whose push never stopped, so it
+was timing an explosion. The MuJoCo row at 100 coming in under the row at 80 is measurement
+noise and a reminder that these are worst-frame numbers from a single fifteen second run.

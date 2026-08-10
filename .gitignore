@@ -1,2 +1,8 @@
 __pycache__/
 *.pyc
+__pycache__/
+MUJOCO_LOG.TXT
+
+# CMake output. It is generated, and CMakeCache.txt bakes in the absolute path of
+# whoever configured it, so a committed copy points at a machine nobody else has.
+build/

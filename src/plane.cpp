@@ -32,7 +32,9 @@
 
 namespace {
 
-constexpr int kSubsteps = 2;   // 8.3 ms physics inside a 16.7 ms frame
+// One 16.7 ms step for one 16.7 ms frame. Two steps of a 16.7 ms model advance the world
+// at twice real time, which is what stepping twice here did.
+constexpr int kSubsteps = 1;
 
 double env_double(const char* name, double fallback) {
   const char* v = std::getenv(name);
@@ -159,6 +161,10 @@ int main(int argc, char** argv) {
   const auto started = last;
   std::uint64_t tick = 0, frames = 0, tick_at_report = 0;
   double worst_step_us = 0.0, worst_encode_us = 0.0, last_report = 0.0;
+  // The periodic line reports the worst since the last line and then clears the two above.
+  // The closing line reports the whole run, so it keeps its own pair. Sharing them printed
+  // zero whenever a run ended on a report boundary, which every round CROWD_SECONDS does.
+  double worst_step_all = 0.0, worst_encode_all = 0.0;
 
   for (;;) {
     const auto now = Clock::now();
@@ -168,11 +174,10 @@ int main(int argc, char** argv) {
     const int steps = clock.advance(elapsed);
     for (int s = 0; s < steps; ++s) {
       const auto t0 = Clock::now();
-      // The model steps at 8.3 ms: a crowd in contact loses a metre of penetration at 16.7
-      // and goes NaN. A 60 Hz frame is therefore two steps, not one.
       for (int k = 0; k < kSubsteps; ++k) mj_step(m, d);
       const double us = std::chrono::duration<double, std::micro>(Clock::now() - t0).count();
       if (us > worst_step_us) worst_step_us = us;
+      if (us > worst_step_all) worst_step_all = us;
       ++tick;
 
       if (tick % 3 == 0) {                       // publish at a third of the sim rate
@@ -207,6 +212,7 @@ int main(int argc, char** argv) {
         }
         const double eus = std::chrono::duration<double, std::micro>(Clock::now() - e0).count();
         if (eus > worst_encode_us) worst_encode_us = eus;
+        if (eus > worst_encode_all) worst_encode_all = eus;
         ++frames;
       }
     }
@@ -242,7 +248,7 @@ int main(int argc, char** argv) {
               static_cast<unsigned long long>(tick), run, tick / run,
               static_cast<unsigned long long>(frames), frame.size());
   std::printf("[plane] worst step %.0f us, worst encode %.0f us, dropped %llu steps\n",
-              worst_step_us, worst_encode_us,
+              worst_step_all, worst_encode_all,
               static_cast<unsigned long long>(clock.dropped_steps()));
 
   mj_deleteData(d);
