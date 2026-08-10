@@ -139,7 +139,14 @@ theorem layers_fit : publishUs + steerUs + contactUs < tickUs := by native_decid
 
 /- ## What the leftover buys
 
-   The number of bodies a plane simulates is derived from the budget. It is never chosen. -/
+   The number of bodies a plane simulates is derived from the budget. It is never chosen.
+
+   SUPERSEDED by the per-plane section below, and kept because it is the arithmetic the
+   airlocks corrected. Everything here charges one plane for steering and contact across the
+   whole venue. That is right for a venue held by one plane and wrong once a venue is rooms,
+   because a plane then only pays for the people in its own room. Charging the full crowd
+   overstated the fleet by half. The theorems still hold. They answer a question the design
+   no longer asks. -/
 
 def bodiesPerPlane (stepUs : Nat) : Nat := biomechUs / stepUs
 
@@ -206,51 +213,110 @@ def venueUs : Nat := publishUs + steerUs + contactUs + poseVenueUs
 
 theorem venue_costs_2860 : venueUs = 2860 := by native_decide
 
-/-- THE ANSWER TO BOTH QUESTIONS. One core carries the whole venue, at 17 percent of a tick.
+theorem posing_a_venue_costs_a_sixth_of_a_core : venueUs * 100 / tickUs = 17 := by
+  native_decide
 
-    The fleet is one core rather than thirty-two, so the cost for each head falls by the same
-    factor. -/
-theorem a_venue_fits_one_core : venueUs < tickUs := by native_decide
+/- ## A plane is one core, and a room is one plane
 
-theorem a_venue_uses_a_sixth_of_a_core : venueUs * 100 / tickUs = 17 := by native_decide
+   Posing is cheap and it is not what a venue runs. A posed body does not fall over, does not
+   get knocked down, and cannot be pushed through its own skeleton. That is the shape a
+   social platform already has, so it is not worth building again. Every body here is
+   physical.
 
-/-- Cost for each head each month, in tenths of a cent. Tenths and not cents, because the
-    answer is 3.8 cents and rounding it to a whole cent loses a fifth of it.
+   Physical bodies do not fit a venue on one core, and that is not the constraint anyway.
+   The constraint is that a plane is one core. A venue is then as many rooms as it needs,
+   one plane for each, joined by airlocks.
 
-    The core-month price is the one weft already pays: thirty-two cores carrying a thousand
-    people came to 122 cents for each head, which puts a core-month at 3812 cents. -/
+   An airlock is what makes this legal rather than a workaround. weft forbids a path that
+   carries per-tick state between machines. An airlock carries none: two people in different
+   rooms never share a contact neighbourhood, so there is nothing per-tick to carry. Somebody
+   crossing is one actor migrating through the store plane, which is the slow durable path
+   weft already has. A doorway takes a moment to walk through, and that moment is what hides
+   the migration. The seam is diegetic.
+
+   So the interesting quantity stopped being "how many cores does a venue need". It is "how
+   many people fit one core", and a venue is that number times its rooms. -/
+
+/-- Costs for one person for one frame, in nanoseconds. Nanoseconds because the smallest of
+    them is 45, and microseconds would round it away.
+
+    Every one of these was measured against a thousand-person crowd and divided down. They
+    are per-person because a plane pays only for the people in its own room, which is the
+    correction the airlocks force: charging every plane for the whole venue overstated the
+    fleet by half. -/
+def publishNsEach : Nat := joints * publishPsEach / 1000
+def steerNsEach : Nat := steerUs * 1000 / people
+def contactNsEach : Nat := contactUs * 1000 / people
+
+/-- MEASURED. One tracked-avatar body under full forward dynamics, one step for each frame
+    at a 16.7 millisecond timestep, in a batch of 28. This is the body that keeps its
+    balance, falls over, and gets pushed. -/
+def dynamicBodyNs : Nat := 29000
+
+def perPersonNs : Nat := publishNsEach + steerNsEach + contactNsEach + dynamicBodyNs
+
+theorem publish_is_45_ns : publishNsEach = 45 := by native_decide
+theorem steer_is_280_ns : steerNsEach = 280 := by native_decide
+theorem contact_is_2433_ns : contactNsEach = 2433 := by native_decide
+theorem a_person_costs_31758_ns : perPersonNs = 31758 := by native_decide
+
+/-- The body is 91 percent of a person. Everything else together is under a tenth, so there
+    is no point tuning the other layers until the body moves. -/
+theorem the_body_is_nine_tenths_of_a_person :
+    dynamicBodyNs * 100 / perPersonNs = 91 := by native_decide
+
+/-- THE ANSWER. One core, one plane, one room, 524 physical people.
+
+    A plane is capped at one core by rule, so this is a capacity and not a target. -/
+def peoplePerPlane : Nat := tickUs * 1000 / perPersonNs
+
+theorem a_plane_holds_524 : peoplePerPlane = 524 := by native_decide
+
+theorem a_plane_fits_its_core : peoplePerPlane * perPersonNs ≤ tickUs * 1000 := by
+  native_decide
+
+/-- One more person does not fit, which is what makes 524 the capacity rather than a guess. -/
+theorem one_more_person_overruns :
+    (peoplePerPlane + 1) * perPersonNs > tickUs * 1000 := by native_decide
+
+/-- Rooms for a crowd, each room one plane on one core. -/
+def roomsFor (crowd : Nat) : Nat := (crowd + peoplePerPlane - 1) / peoplePerPlane
+
+theorem a_thousand_is_two_rooms : roomsFor people = 2 := by native_decide
+theorem ten_thousand_is_twenty_rooms : roomsFor 10000 = 20 := by native_decide
+
+/- ## Cost
+
+   Tenths of a cent, because the answer is 7.3 and a whole cent loses a third of it. The
+   core-month price is the one weft already pays: thirty-two cores carrying a thousand people
+   came to 122 cents for each head, which puts a core-month at 3812 cents. -/
+
 def coreMonthCents : Nat := 3812
 def tenthCentsPerHead (cores : Nat) : Nat := coreMonthCents * 10 * cores / people
 
-/-- 121.9 cents, the musculoskeletal answer. -/
+/-- 121.9 cents, the musculoskeletal answer, for detail no tracker reports. -/
 theorem musculoskeletal_costs_122_cents : tenthCentsPerHead 32 = 1219 := by native_decide
 
-/-- 3.8 cents, the tracked answer, under the four-cent target. -/
-theorem tracked_costs_under_four_cents : tenthCentsPerHead 1 = 38 := by native_decide
-theorem tracked_is_under_the_target : tenthCentsPerHead 1 < 40 := by native_decide
+/-- The marginal cost of one more head, once a room is full: a core-month divided by the
+    people on it. 7.2 tenths of a cent, and it does not depend on how large the venue is,
+    because a larger venue is more rooms and not a fuller one. -/
+def tenthCentsMarginal : Nat := coreMonthCents * 10 / peoplePerPlane
 
-/-- Thirty-two times cheaper, and the reason is not a faster body. It is a body that stopped
-    computing what a tracker already reports. -/
-theorem the_fleet_shrank_thirtyfold :
-    tenthCentsPerHead 32 / tenthCentsPerHead 1 = 32 := by native_decide
+theorem a_head_costs_seven_tenths_of_a_cent : tenthCentsMarginal = 72 := by native_decide
 
-/- ## What the leftover tick buys
+/-- What a thousand people actually cost, which is two whole cores and not 1.9 of one. -/
+theorem a_thousand_costs_76_tenths :
+    tenthCentsPerHead (roomsFor people) = 76 := by native_decide
 
-   Posing the venue leaves most of the tick unspent, and forward dynamics is still there for
-   whoever needs it. A body nobody is wearing has no tracker to pose it from, so an
-   unattended body is simulated rather than posed. -/
+/-- Sixteen times cheaper than simulating muscles, with the same physical body behaviour:
+    balance, falling, and being pushed. -/
+theorem physical_bodies_cost_a_sixteenth :
+    tenthCentsPerHead 32 / tenthCentsPerHead (roomsFor people) = 16 := by native_decide
 
-def headroomUs : Nat := tickUs - venueUs
-
-/-- MEASURED. One tracked-avatar body under full forward dynamics, one step for each frame
-    at a 16.7 millisecond timestep, in a batch of 28. -/
-def dynamicBodyFrameUs : Nat := 29
-
-def dynamicBodiesInHeadroom : Nat := headroomUs / dynamicBodyFrameUs
-
-/-- The same core that poses a thousand tracked people also simulates 476 unattended bodies
-    outright. A venue does not have to choose between the two. -/
-theorem headroom_carries_476_simulated : dynamicBodiesInHeadroom = 476 := by native_decide
+/-- Four tenths of a cent was the target and this misses it. The gap is the price of physics.
+    Posing hits 3.8 and cannot fall over, so the two are alternatives and not a trade to
+    split. -/
+theorem the_four_cent_target_is_missed : tenthCentsMarginal > 40 := by native_decide
 
 /- ## The levers that are spent
 
