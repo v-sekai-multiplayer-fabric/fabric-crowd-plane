@@ -70,6 +70,31 @@ seconds. A linear policy trained with ARS does not learn it in 2750 iterations. 
 are recorded, and both say the same thing, which is that standing balance for a 27 degree of
 freedom humanoid is a real problem and not a gain to tune.
 
+## The steel thread
+
+The prototype is one thin path that touches every layer, end to end, and it is not a demo of
+physics alone. It is:
+
+**Two people in a room push each other. One walks through a doorway. The room on the far side
+is a different machine that was asleep. They arrive with their state and keep pushing.**
+
+Every part of that sentence is a layer, and each is there because leaving it out would let a
+later layer cheat:
+
+| the sentence | the layer | state |
+| --- | --- | --- |
+| two people in a room | one MuJoCo model, one contact solve | measured, `bench/touchable.py` |
+| push each other | contact between articulated bodies | measured |
+| walk | the character controller | in training |
+| through a doorway | the airlock, hiding a 3.4 s wake | not built |
+| a different machine | placement, and a room that was stopped | not built |
+| that was asleep | scale to zero, which is what 15 dollars buys | measured, `bench/fly/room.py` |
+| with their state | durable actor storage | designed, `Weft.Actor` holds a memory map |
+| and keep pushing | the same contact solve on the far side | measured |
+
+The migration is in the thread on purpose. Without it the 15 dollar price is a lie, because
+the price comes from machines that stop, and machines that stop mean players that move.
+
 ## The speedrun, in order
 
 1. **A controller that stands and takes a stick.** It is learned. Two routes:
@@ -88,10 +113,16 @@ freedom humanoid is a real problem and not a gain to tune.
 4. **One machine on Fly**, scale to zero, admission on measured tick load and on the
    person-hour budget.
 5. **Sixty people in a room, pushing each other.** That is the demo, and it is the pitch.
+6. **One of them walks through a doorway onto a second machine and keeps pushing.** That is
+   the steel thread closing, and it is what proves the price rather than the physics.
 
 ## What is deliberately not being built
 
-Airlocks, cross-machine interest fanout, and per-tick state between machines. A touchable
-crowd is one contact solve on one machine, so a venue larger than one machine cannot share
-the only feature worth selling. `docs/logbook/crowd.md` records why the airlock was
-retired after being designed.
+Cross-machine interest fanout, and per-tick state between machines. A touchable crowd is one
+contact solve on one machine, so a venue larger than one machine cannot share the only
+feature worth selling.
+
+The **airlock stays**, for a reason its first design got wrong. It is not a way to make a
+venue bigger. It is the seam where the machine running you changes, which happens because
+rooms stop when empty and that is what makes the price. `docs/logbook/crowd.md` records the
+retirement and the reversal.

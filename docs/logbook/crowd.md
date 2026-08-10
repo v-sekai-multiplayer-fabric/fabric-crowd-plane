@@ -118,3 +118,43 @@ competes with and well under the 500 this logbook assumed for most of its length
 The pin is a cheat and it has to go. A pinned root cannot be pushed, and being pushed is the
 entire product. The number above is what the crowd costs once a stance controller exists.
 Until then there is standing or there is touching, and not both.
+
+## UN-RETIRED: the airlock, for a reason the retirement missed
+
+The entry above retires the airlock, on the grounds that it is the seam where touch stops and
+that any venue worth building fits one contact solve. Both claims still hold. The conclusion
+drawn from them does not.
+
+What it missed is that **migration is not a travel feature**. It is the mechanism underneath
+the price.
+
+The 15 dollar venue costs 15 dollars because the machine stops when the room is empty and
+wakes to its first tick in 3.4 seconds, measured. That is scale to zero, and it is worth 5.6
+times the bill. But a room that sleeps is a room players are moved into and out of, so
+scale-to-zero **is** migration seen from the outside.
+
+And one machine holds 139 people at the measured cost. The 140th has to go somewhere.
+
+So there are three reasons a player crosses machines, and none of them is a travel mechanic:
+
+| why | how often | what it costs if it is visible |
+| --- | --- | --- |
+| the room was asleep and had to wake | every first arrival | 3.4 seconds of nothing |
+| the room is full at 139 | at capacity | a refusal, or a jump |
+| the machine died | rarely | a reconnect, and lost state without a store |
+
+An airlock is what turns each of those from a freeze into a walk. That is a much better
+argument than the one it was retired on, and it is the one that should have been written
+first.
+
+### What this changes about the shape
+
+The airlock is not a doorway to another *place*. It is a doorway to another *machine*, and
+the room on the far side may be the same room. That is the part the earlier design got
+backwards: it treated the airlock as a graph edge between venues, when it is really the
+seam where the process running you changes.
+
+Which also settles what has to be true for it to work. Crossing must carry the player's
+durable state, so `Weft.Actor` needs to write to disk, which it does not yet. Until then a
+crossing loses everything, and a demo that loses everything on a doorway is worse than no
+doorway.
