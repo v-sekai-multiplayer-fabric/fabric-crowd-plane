@@ -479,3 +479,36 @@ There is no cheap mathematical wall here. What there is:
 
 The practical position is unchanged: about 22 bytes at 60 Hz, about 25 at 20 Hz, and the next
 honest gain comes from measuring on real motion rather than from another transform.
+
+## Real motion, and why it still does not settle the rate. Codec work stops here.
+
+`bench/wire_real_motion.py`, 400 Mixamo motion-capture clips, 159 rotation channels sampled
+at 20 Hz, 2.4 M symbols.
+
+| order | contexts | samples for each | B/body/frame | gain |
+| --- | --- | --- | --- | --- |
+| 0 | 1 | 15358 | 82.9 | |
+| 1 | 15 | 1024 | 68.7 | 14.2 |
+| 2 | 225 | 68 | 59.1 | 9.5 |
+| 3 | 3375 | **5** | 47.0 | 12.1 |
+
+Inconclusive, for two reasons.
+
+The gains still do not diminish, and order-3 still sees five samples for each context, so it
+is still memorising. More clips would fix that and this run used 400 of 2457.
+
+More importantly the skeleton is not ours. Mixamo carries 159 rotation channels against 26
+muscles here, so 82.9 bytes is a bigger body, not a worse coder. Nothing in this table
+transfers to the number the budget uses.
+
+**Codec work stops here.** The wire is about 22 bytes for a body for a frame with muscles at
+order-2 and the root in page bounds, which is 72 always-on players at 15 dollars, and the
+remaining uncertainty is a question about a bound rather than about a design. What is left is
+worth doing when there is a reason, and there is not one now: the format is decided, it is
+conformant, and it is within 5 percent of the body-oriented ideal it was feared to be twice
+as expensive as.
+
+For whoever picks this up: `nimblephysics` reads the AddBiomechanics `.b3d` files and has no
+wheel for the Pythons installed here. **Use pixi.** That corpus is 52 GB of real human motion
+with a biomechanical skeleton, which is a far better source for this question than either a
+driven ragdoll or a Mixamo rig.
