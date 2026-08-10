@@ -30,15 +30,26 @@ apparatus for each.
 | quantity | value | where |
 | --- | --- | --- |
 | one body, one frame, in a real 60 Hz loop on Fly | 55 us | measured |
-| concurrent bodies, one core, physics at half the tick | about 120 to 150 | measured |
+| concurrent bodies, one core, physics at half the tick | about 139 | measured |
 | wire, one body, one frame | 21 bytes | measured |
-| person-hours for 15 dollars a month | about 14000 | derived |
-| the same, as always-on players | about 19 | derived |
+| person-hours for 15 dollars a month | about 43000 | derived |
+| the same, as always-on players | about 59 | derived |
 | a room that wakes from stopped to its first tick | 3.4 s | measured |
 
-The venue is **one Fly machine**, `performance-2x`, stopped whenever it is empty, with
-FoundationDB single-node on the same box. A 1 GB volume at 15 cents a month is the only cost
-that accrues with nobody present.
+The venue is **one Fly machine, `shared-cpu-2x` with 1 GB**, stopped whenever it is empty,
+with FoundationDB single-node on the same box in `ssd` mode, backed up to the S3-compatible
+endpoint. A 1 GB volume at 15 cents a month is the only cost that accrues with nobody
+present.
+
+Shared rather than dedicated because it was measured rather than assumed: at 22 percent load
+the two classes are the same machine, 3679 microseconds against 3594 at the median, one
+missed tick in 36000 against none. Dedicated buys a tighter tail and costs 5.6 times, and an
+earlier draft of this plan bought it on the strength of a 237 millisecond figure that turned
+out to be a machine running at 99 percent rather than a machine being shared.
+
+**Egress is now most of the bill.** At the lean wire it is 65 percent of the cost of a
+person-hour and the machine is the rest, so the next optimisation is bytes and not cycles.
+Halving the wire again is worth more than any remaining physics work.
 
 ## What is built
 
