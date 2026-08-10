@@ -1,6 +1,6 @@
 # fabric-crowd-plane
 
-A thousand people in one venue. Simulated at 60 Hz, published at 20 Hz, with one entity for
+Simulate a thousand people in one venue at 60 Hz, published at 20 Hz, with one entity for
 each joint.
 
 State: the budget is proved but nothing is built.
