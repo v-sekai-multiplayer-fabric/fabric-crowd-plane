@@ -11,7 +11,7 @@
 #
 # Every number in spec/CrowdBudget.lean that depends on the body cost comes from here.
 import time, statistics, mujoco, os
-MODEL = os.environ.get("MSH", "MS-Human-700/MS-Human-700.xml")
+MODEL = os.environ.get("MSH", "thirdparty/ms-human-700/MS-Human-700.xml")
 os.chdir(os.path.dirname(MODEL) or ".")
 MODEL = os.path.basename(MODEL)
 
