@@ -295,3 +295,17 @@ above should be read as a ceiling that is never reached.
 The load ratio in `spec/CrowdBudget.lean` is what makes this safe without a constant. This
 entry is why it is needed: the number that was wrong was not the body cost. It was the
 belief that a measured body cost predicts a loop.
+
+## The airlock is retired
+
+The measurements stand: a stopped room wakes to its first tick in 3.4 seconds over three
+restarts, a cold create takes 5.9, and 60 occupants on one core run at a load of 0.21 median
+and 0.31 at p99 with no missed ticks in 1199.
+
+The mechanism they were taken for does not. The product sells solid bodies, an airlock is
+the seam where solidity stops, and one contact solve already holds about 2000 people. Any
+venue worth building is one room.
+
+The cold start numbers keep their value under a different heading. Scale to zero makes an
+empty room free, which is what the 15 dollar budget rests on, and 3.4 seconds is how long a
+returning player waits. Neither has anything to do with travel between rooms.

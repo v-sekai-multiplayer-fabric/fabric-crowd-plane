@@ -548,7 +548,33 @@ theorem culling_wins_everywhere :
     venueCulled 2 16 > venueAllToAll 16
       ∧ venueCulled 2 256 * 10 / venueAllToAll 256 = 20 := by native_decide
 
-/- ### What is still not bought, and why the airlocks stay
+/- ### YAGNI: the airlock
+
+   RETIRED. The sections above design an airlock, and they were wrong to.
+
+   The product has one feature, which is that bodies are solid and people can touch each
+   other. An airlock is the seam where that stops. It joins two rooms, and two people in
+   different rooms cannot touch, so the mechanism exists to make a boundary invisible across
+   which the only thing worth selling does not work.
+
+   Contact is one solve on one machine, and it caps at about 2000 people. Any venue this
+   product would plausibly want is therefore one room, and a room needs no airlock. Two
+   rooms are two crowds, and two crowds are two instances, which every platform already
+   joins with a menu and a load. Nobody has asked for that to be seamless.
+
+   `docs/essays/yagni.md` names the one thing that reopens this: a measured workload that
+   does not fit one machine. There is none. A single room already holds 25 times the
+   ceiling of the platform this competes with.
+
+   What survives is not the airlock. It is scale to zero, which is a different mechanism
+   with a different reason: a stopped room bills nothing and wakes to its first tick in 3.4
+   seconds, measured, so an empty venue is free and a returning one is quick. That pays for
+   itself in the 15 dollar budget and it has nothing to do with travel between rooms.
+
+   The sections below are kept because they hold the measurements and the reasoning that
+   retired them. Read them as the arithmetic of a path not taken. -/
+
+/- ### What was still not bought, and why the airlocks were kept
 
    A replica is read-only and it is allowed to be stale. Somebody a person can see may be a
    frame or two behind and nothing is wrong. Somebody a person can touch may not be, because
