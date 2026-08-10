@@ -440,3 +440,34 @@ neither.
 First run, 300 iterations in 26 seconds: the return did not move, 130 at the start and 139 at
 the end. A return of 130 is about 43 steps, so the body was falling inside a second and the
 policy had learned nothing. Training is cheap enough that the answer is more of it.
+
+## Reinforcement learning, and a target that is not balance
+
+ARS with a linear policy ran 2750 iterations and did not learn. The return started at 88 and
+ended at 164, which is about 55 steps before falling, with no trend. That is the linear
+policy doing the job it was picked for: it says the task needs capacity, not more search.
+
+It also says the target was wrong. A balance controller keeps a body upright and does
+nothing else. What a social world needs is what a console game has: a character controller
+that takes a stick, walks, turns, and runs, and that stays physical while it does so. VRChat
+moves an avatar kinematically along a capsule and the physics is decoration. A physically
+simulated character controller is the thing that cannot be faked, and standing still is the
+degenerate case of it rather than the goal.
+
+NVIDIA's ProtoMotions 3 is that, and it is Apache-2.0. `examples/experiments/steering` is
+literally the task: walk in a target direction at a target speed, with Adversarial Motion
+Priors keeping the gait natural, and the target changing periodically. Its sibling
+`path_follower` follows a path. Both are commands, not playback.
+
+The ecosystem around it matters as much. SOMA is a standard skeleton that unifies parametric
+body models, and there are pretrained motion trackers for a SOMA 23-body humanoid with 66
+actions, trained with PPO on the BONES-SEED corpus. A motion tracker is the other half of
+the product: a body that follows a reference pose physically, so being pushed is a deviation
+the policy recovers from rather than an animation that ignores it.
+
+Apparatus. The machine that ran every earlier measurement has an RTX 4090 in it, which went
+unused for the whole session. ProtoMotions installs with `torch` on cu124 and its MuJoCo
+extra, except `openmesh==1.2.1` which does not build here and is not needed to train.
+Training needs a GPU-parallel backend: the MuJoCo backend asserts `num_envs == 1` and is for
+inference only. Newton 1.0.0 with Warp 1.16.0 installs cleanly and is what the training below
+uses.
