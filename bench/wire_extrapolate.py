@@ -38,22 +38,28 @@ def main():
             prev = np.stack([d.xpos[1:] for d in ds])
 
     print(f"{nb} joints, {B} bodies, {F} frames. Error is what a viewer sees, in millimetres.")
-    print(f"{'send rate':>10} {'hold, mean':>12} {'hold, p99':>10} "
-          f"{'extrap, mean':>13} {'extrap, p99':>12} {'kB/s a body':>12}")
+    print(f"{'send rate':>10} {'hold, mean':>12} {'hold p99':>10} "
+          f"{'extrap, mean':>13} {'extrap p99':>12} "
+          f"{'interp, mean':>13} {'interp p99':>12} {'kB/s':>10}")
     for hz in (20, 10, 5, 2):
         step = SIM_HZ // hz
-        hold_e, ext_e = [], []
-        for k in range(0, F - step, step):
+        hold_e, ext_e, int_e = [], [], []
+        for k in range(0, F - 2 * step, step):
             for j in range(1, step):
                 t = j / SIM_HZ
+                a = j / step                      # interpolation needs the NEXT sample too
                 truth = pos[k + j]
                 hold_e.append(np.linalg.norm(truth - pos[k], axis=-1))
                 ext_e.append(np.linalg.norm(truth - (pos[k] + vel[k] * t), axis=-1))
+                int_e.append(np.linalg.norm(
+                    truth - ((1 - a) * pos[k] + a * pos[k + step]), axis=-1))
         h = np.concatenate([e.ravel() for e in hold_e]) * 1000
         x = np.concatenate([e.ravel() for e in ext_e]) * 1000
+        n = np.concatenate([e.ravel() for e in int_e]) * 1000
         kbs = 108 * hz / 1000
         print(f"{hz:>8} Hz {h.mean():>12.1f} {np.percentile(h,99):>10.1f} "
-              f"{x.mean():>13.1f} {np.percentile(x,99):>12.1f} {kbs:>12.2f}")
+              f"{x.mean():>13.1f} {np.percentile(x,99):>12.1f} "
+              f"{n.mean():>13.1f} {np.percentile(n,99):>12.1f} {kbs:>10.2f}")
 
 
 if __name__ == "__main__":

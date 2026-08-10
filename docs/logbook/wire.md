@@ -193,12 +193,16 @@ Every measurement in this book sent it as **zero**.
 
 `bench/wire_extrapolate.py`, position error a viewer would see, in millimetres:
 
-| send rate | hold, mean | hold p99 | extrapolate, mean | extrapolate p99 |
-| --- | --- | --- | --- | --- |
-| 20 Hz | 59.5 | 266 | **32.3** | **203** |
-| 10 Hz | 112.0 | 508 | 85.3 | 532 |
-| 5 Hz | 197.8 | 826 | 210 | 1220 |
-| 2 Hz | 363.6 | 1231 | 599 | 3333 |
+| send rate | hold | extrapolate | interpolate |
+| --- | --- | --- | --- |
+| 20 Hz | 59.5 | **32.3** | **15.5** |
+| 10 Hz | 112.0 | 85.2 | **38.5** |
+| 5 Hz | 197.8 | 209.8 | **86.0** |
+| 2 Hz | 365.9 | 603.4 | **199.3** |
+
+Interpolation beats both at every rate, and by enough to change a decision: **interpolating at
+10 Hz is better than holding at 20**, which is better quality at half the bandwidth. It costs
+one send interval of latency, which is 100 milliseconds at 10 Hz.
 
 It halves the error at 20 Hz and **makes things worse below 10**. Limbs swing, so carrying a
 joint forward in a straight line overshoots the turn, and the further it is carried the more
@@ -247,3 +251,25 @@ netcode and it is worth doing.
 | interpolate near bodies | do not — it spends the latency the product sells |
 | lockstep over a deterministic sandbox | no — every client would simulate the whole room |
 | local prediction of your own body | worth doing, and needs no determinism |
+
+## Evaluated: the levers buy quality, not capacity
+
+| configuration | kB/s | egress share | always-on | why |
+| --- | --- | --- | --- | --- |
+| baseline: 4 near at 20 Hz held, 70 far at 1 Hz | 9.5 | 88 percent | 26 | |
+| plus extrapolation on near bodies | 9.5 | 88 | **26** | error 59.5 to 32.3 mm, zero bytes |
+| plus interpolation on far bodies | 9.5 | 88 | **26** | smoother, zero bytes |
+| near at 10 Hz interpolated | 5.2 | 80 | 44 | error 38.5 mm, and **100 ms** |
+
+**The cost does not move.** Both adopted levers are free in bytes: velocity is already inside
+the 100-byte packet and was being sent as zero, and interpolating far bodies changes what the
+client does with samples it already receives. They halve the visible error and buy nothing at
+the till.
+
+The one that would move the cost is the one that cannot be taken. Near bodies are **91 percent
+of the wire**, and the only way to shrink them is to send them less often, which needs
+interpolation, which costs 100 milliseconds on exactly the bodies a player can reach. That is
+the latency the product exists to sell.
+
+So the number stands at **24 to 26 always-on for 15 dollars**, and this line of work is
+finished: the wire is as small as it gets without spending the thing being sold.
