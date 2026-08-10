@@ -358,3 +358,66 @@ So the decision to accept the packet was right, and the reasoning under it was w
 skeleton-class extension discussed earlier is also unnecessary: the position field does not
 need removing from the schema, it only needs to stop varying, and the rotation field was
 already the correct shape.
+
+## Four more tricks, two of which work
+
+`bench/wire_dirty_tricks.py`. Three borrowed from Godot's animation compression, one asked
+for directly.
+
+### Page bounds on the root: a small win
+
+Godot quantises a position into a bounding box computed for each page rather than a global
+range, then stores 16 bits for each component. Applied to the root position, that takes it
+from 4.2 to 3.1 bytes for a body for a frame. Real, and it is the smallest of the four.
+
+### Octahedral encoding: no, and the arithmetic says why
+
+| | bits for a joint |
+| --- | --- |
+| octahedral: axis at 2 x 16, angle at 16 | 48 |
+| swing-twist with anatomical ranges | 31, being 10 to 12 each |
+
+Swing-twist is smaller by 17 bits. Octahedral buys **uniform quantisation error over a
+sphere**, which is what a codec wants when it does not know where the values live. We do know:
+the muscle system states each joint's range outright, so the bits are already spent where the
+motion is. Godot cannot assume that because it compresses arbitrary animation tracks.
+
+### Error-bounded key dropping: loses here
+
+Sending a muscle only once its held value drifts past a threshold:
+
+| threshold | fraction sent | B/body/frame | mean error | p99 |
+| --- | --- | --- | --- | --- |
+| 0.2 deg | 94 percent | 29.2 | 0.01 | 0.18 |
+| 0.5 | 88 | 27.9 | 0.03 | 0.44 |
+| 1.0 | 79 | 25.9 | 0.11 | 0.97 |
+| 2.0 | 67 | 23.0 | 0.33 | 1.94 |
+
+Every row is worse than the 20.4 baseline. A presence mask costs about 3.25 bytes for a body
+each frame, and dropping a third of the symbols at a visible 2 degrees of error does not pay
+it back. The reason is the workload: these bodies are driven at 120 newton-metres and every
+muscle is moving. A mostly-still crowd would change the answer, and a run-length coded mask
+would lower the floor, so this is a negative result for this motion rather than for the idea.
+
+### Order-2 context: the largest of the four
+
+| model | B/body/frame, muscles only |
+| --- | --- |
+| order-0 | 27.3 |
+| order-1, its own previous delta | 22.7 |
+| **order-2, two previous deltas** | **19.0** |
+
+17 percent then another 16. A muscle's delta is predicted better by its recent trajectory than
+by its last value alone, which is what a limb swinging through an arc looks like to a coder.
+
+### A bug in the baseline, found by these numbers disagreeing
+
+The order-1 figure here is 22.7 while an earlier line in the same benchmark reported 17.3. The
+earlier one used the **current** delta as its own context, so the symbol was leaking into the
+thing predicting it. Entropy measured that way is not achievable by any coder. 22.7 is the
+honest number, and every order-1 figure in this book taken the same way is optimistic.
+
+### Where it lands
+
+Muscles at order-2 and the root in page bounds is **22.1 bytes for a body for a frame**, which
+is 2.9 kB a second for a client and 67 always-on players at 15 dollars.
