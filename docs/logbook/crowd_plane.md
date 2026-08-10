@@ -471,3 +471,58 @@ extra, except `openmesh==1.2.1` which does not build here and is not needed to t
 Training needs a GPU-parallel backend: the MuJoCo backend asserts `num_envs == 1` and is for
 inference only. Newton 1.0.0 with Warp 1.16.0 installs cleanly and is what the training below
 uses.
+
+## Running the pretrained tracker, which does nothing
+
+`~/.config/systemd/user/weft-tracker.service`. The SOMA BONES-SEED FSQ motion tracker,
+69 MB of PPO weights for a 23-body humanoid with 66 actions, run against its own
+`soma23_bones_seed_mini` motion set in the MuJoCo backend.
+
+It loads 61 motions and steps. It also does nothing:
+
+    WARNING:absl: Nan, Inf or huge value in QACC at DOF 0. Time = 0.0030
+    [Step   1] root_pos=[0,0,0] root_vel=[0.00,0.25,2.20] max_dof_vel=9.653 max_ctrl=0.0 ncon=27
+    [Step 601] root_pos=[0,0,0] root_vel=[0.00,0.25,2.20] max_dof_vel=9.653 max_ctrl=0.0 ncon=27
+
+Six hundred steps apart and byte-identical, with `max_ctrl=0.0`, so the policy emits no
+torque at all. The model card says it was trained in IsaacLab, and nothing claims the weights
+transfer to MuJoCo. The NaN in QACC on the first step says the same. A pretrained checkpoint
+is only pretrained for the simulator it was trained in.
+
+### Four things that had to be fixed before it would even run
+
+Worth recording because none of them are about humanoids.
+
+A system unit runs as `init_t`, and SELinux under Enforcing refuses to let `init_t` exec an
+interpreter labelled `user_home_t` or `user_tmp_t`. `SELinuxContext=` in the unit did not
+help. A USER unit runs in the user's own unconfined context and works, so the job is
+`systemctl --user`, followed with `journalctl --user -u weft-tracker -f`.
+
+The install was under `/tmp`, which on this host is tmpfs, so 16 GB of it were sitting in
+RAM. Moving it to a real filesystem fixed the label problem and gave back the memory.
+
+An editable install remembers its path, so moving the tree broke the import until
+`uv pip install -e .` was rerun.
+
+`MUJOCO_GL=osmesa` fails here because PyOpenGL cannot load a GL library. `egl` works, and the
+machine has a 4090 to back it.
+
+### Apparatus, corrected
+
+The machine that ran every measurement in this logbook has an RTX 4090 in it. Everything
+above was measured on the CPU because nobody checked. The desk figures stand as CPU figures
+and the comparison against Fly is still like for like, but any future training belongs on the
+GPU.
+
+## Motion data
+
+`Datasets` on the house share carries what the training needs.
+
+`Mixamo_Full_Animation_Packs/BVH_T-Pose.rar`, 104 MB, extracts to **2457 BVH clips** with a
+Hips root and a standard humanoid hierarchy. This is a retarget away from a SOMA MotionLib.
+`7z` cannot read RAR; `unar` can.
+
+`addb-all`, 67 GB, is AddBiomechanics as train and test splits under `With_Arm`, by study:
+Han2023, Carter2023, vanderZee2022 and others. This is the same corpus the sinew calibrator
+set was sampled from, except these are sequences rather than sampled poses, so it is also
+what the temporal compression question needed and could not get earlier.
