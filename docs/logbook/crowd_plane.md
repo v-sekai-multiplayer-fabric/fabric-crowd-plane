@@ -410,3 +410,26 @@ competes with and well under the 500 this logbook assumed for most of its length
 The pin is a cheat and it has to go. A pinned root cannot be pushed, and being pushed is the
 entire product. The number above is what the crowd costs once a stance controller exists.
 Until then there is standing or there is touching, and not both.
+
+## A trained stance, and what makes a constant acceptable
+
+The rule this project works under says not to add a tuning constant, because a constant is a
+guess about a workload nobody has measured. The sharper form of it, and the one adopted here,
+is that a constant is acceptable when it holds across every known case and carries margin for
+the known unknowns. Then it is not a guess with a name. It is a measurement with a name.
+
+That decides how a trained policy is judged. It is the largest constant a system can have,
+so it is not admitted on principle and it is not refused on principle either. It is admitted
+on coverage: does it hold a stance when the body starts off balance, when it is pushed, when
+it is crowded, and when it stands on someone's foot. Those are the known cases. The known
+unknown is a crowd denser than any measured, and the margin against it is that a body which
+fails should fall over, which is a legal outcome rather than an explosion.
+
+`bench/train_stance.py` trains a LINEAR policy with Augmented Random Search: one matrix from
+64 observations to 26 torques, 1664 parameters. Linear matters twice over. Inference for a
+whole crowd is a single matmul, and a matrix can be read, stored, and diffed, where a network
+cannot.
+
+First run, 300 iterations in 26 seconds: the return did not move, 130 at the start and 139 at
+the end. A return of 130 is about 43 steps, so the body was falling inside a second and the
+policy had learned nothing. Training is cheap enough that the answer is more of it.
