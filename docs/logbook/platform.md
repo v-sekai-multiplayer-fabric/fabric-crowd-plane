@@ -393,3 +393,53 @@ thing starvation kills.
 It also explains why the first diagnosis was wrong. The frame builder was measured at 0.1
 milliseconds and cleared, and it was never the problem: the loop was not slow, it simply never
 gave anything else a turn.
+
+## The plane starved its own event loop, and the fix has a proof behind it
+
+The deployed room refused connections intermittently. It looked like the network and it was
+not.
+
+    rest = t0 + i * TICK - time.perf_counter()
+    if rest > 0:
+        await asyncio.sleep(rest)
+
+When the plane falls behind, `rest` goes negative and **nothing awaits**. The loop spins, the
+event loop never runs, and an incoming handshake is never serviced. Connections succeeded only
+when the plane happened to be keeping up, which is why it worked once and then stopped.
+
+It was falling behind for a separate reason: packet encoding. Building 1040 packets a frame in
+Python cost **7956 microseconds against 1169 for the physics itself**. A numpy structured
+dtype matching the layout byte for byte does the same work in **88**, ninety times faster,
+still passing 64 of 64 golden vectors. The velocity field is populated now too, which it had
+never been.
+
+### The loop, rewritten
+
+Godot's shape: an accumulator of real time, spent in whole fixed steps, with a cap on how many
+steps one pass may take and the remainder discarded past it. A plane then runs *slower* than
+real time under load, visibly, instead of running late forever.
+
+Godot caps at `max_physics_steps_per_frame`, default 8. This does not, because there is a
+derived number available. `lean-spatial-oracle/core/Resources.lean`:
+
+    latencyTicksFloor = max (simTickHz / 10) 1
+    perNeighborLatencyTicks rtt = max (ceil(rtt*hz/1000) + drainMargin) latencyTicksFloor
+
+That is the lateness the fabric already tolerates: the staging timeout before a migration is
+called failed, with a one-tick drain margin proved sufficient. Inside it, being late is
+something the rest of the system is built to absorb. Outside it, the ghost bounds and waypoint
+periods stop holding, so continuing to chase the debt would simulate a world nothing else
+agrees with.
+
+**Six steps at 60 Hz, 100 milliseconds**, and it moves with the tick rate rather than being
+pinned to 8.
+
+### Live
+
+40 bodies, 136 person-to-person contacts, one `shared-cpu-1x` in sjc, a client on a laptop and
+a browser drawing it. The client reports **1.5 kB a frame, 36 bytes for a body**.
+
+Recordings are in `~/weft-videos` as MKV, AV1 because Fedora ships ffmpeg without x264,
+captured losslessly first and encoded second so a slow encoder cannot drop frames of the thing
+being recorded. Title burned in, `CITATION.cff` metadata in the container, 30 seconds, with a
+9:16 crop for a feed. They are artefacts and not committed, per `CLAUDE.md`.
