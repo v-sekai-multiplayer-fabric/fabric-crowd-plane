@@ -547,3 +547,56 @@ weights work immediately and their skeleton, SOMA-23, is one we would likely ado
 
 The second is faster to a demo and the first is faster to a product, because a policy trained
 in a simulator we do not run is a policy we cannot change.
+
+## HYPOTHESIS: how long sim-to-sim transfer takes
+
+Recorded before doing it, so it can be wrong in public.
+
+The product trains on a GPU and deploys on a CPU. Training needs thousands of parallel
+environments, which is IsaacLab or Newton. Deployment is one Fly `performance-2x` with no
+GPU, which is MuJoCo. So a policy has to cross simulators, and the question is what that
+costs.
+
+The answer depends entirely on which simulator it trains in, and the two candidates are not
+the same kind of gap.
+
+**Newton to MuJoCo is not really a transfer.** Newton exposes `SolverMuJoCo`, and the crash
+that blocked training came from `mujoco_warp/_src/solver.py`. Newton is MuJoCo's own solver
+compiled through Warp onto the GPU. Same contact model, same constraint solver, same MJCF.
+What differs is float precision, solver iteration count, timestep, and how many contacts the
+GPU path keeps. All four are numbers we set on both sides.
+
+**IsaacLab to MuJoCo is a real transfer.** PhysX is a different engine with a different
+contact model and a different actuator model. Nothing carries over except the intent.
+
+### The predictions
+
+| route | training runs to a working policy | elapsed | confidence |
+| --- | --- | --- | --- |
+| Newton to MuJoCo | 1 to 2 | hours to two days | moderate |
+| IsaacLab to MuJoCo | 5 to 10, with domain randomisation | one to four weeks | low |
+
+One training run for a single steering task on one skeleton and flat terrain is estimated at
+one to four hours on the 4090. That figure is a guess from ProtoMotions' own claim of 12
+hours on four A100s for the entire 40-hour AMASS corpus, which is a far larger job, so the
+error bar on it is wide.
+
+### What would falsify each
+
+Newton to MuJoCo is wrong if a policy trained in Newton and run in MuJoCo falls over
+immediately, or if matching the two configurations turns out to need more than the four
+numbers above. That would mean the GPU solver diverges from the CPU one in a way the
+configuration cannot express, which would be worth knowing on its own.
+
+IsaacLab to MuJoCo is wrong in the optimistic direction if NVIDIA already trained with
+enough domain randomisation that their checkpoints transfer untouched. The one attempt so
+far failed, but it failed with `max_ctrl` exactly 0.0 at every step, which is more consistent
+with actions never reaching `data.ctrl` than with a policy behaving badly. That attempt does
+not settle the question and should not be cited as if it did.
+
+### The decision this drives
+
+Train in Newton, deploy in MuJoCo, because same-engine transfer is the cheap one and because
+a policy trained in a simulator we do not run is a policy we cannot change. The cost of being
+wrong is bounded: if Newton to MuJoCo does not transfer, the fallback is domain randomisation
+in Newton, which is the same work as the IsaacLab route without the second engine.
