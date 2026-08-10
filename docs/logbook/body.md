@@ -83,3 +83,50 @@ penetration check finds it.
 
 The driving here is violent and puts 90 mm on the safe setting too, so this ranks the
 settings and certifies none of them.
+
+## The timestep the whole budget used is unstable for a crowd
+
+The demo teleported. Bodies jumped, popped out of each other, and eventually the run went
+NaN. Measured, 40 bodies pushed for 20 simulated seconds, substeps chosen to keep the frame
+at 60 Hz:
+
+| timestep | substeps | deepest penetration | max qvel | teleporting frames | us/frame |
+| --- | --- | --- | --- | --- | --- |
+| **16.7 ms** | 1 | **-1133 mm** | **18729404** | **118 of 1200** | 2340 |
+| **8.3 ms** | 2 | **-46 mm** | 23 | **0** | **5490** |
+| 4.2 ms | 4 | -40 mm | 33 | 0 | 9405 |
+| 2.1 ms | 8 | -53 mm | 99 | 468 | 18793 |
+
+At 16.7 ms the solver loses **a metre** of penetration, ejects bodies at velocities near ten
+million, and dies. Halving the step fixes all three at once.
+
+### The error, and it is mine
+
+An earlier entry measured the timestep on **one** body, found 8 ms stable under a driven
+muscle load, and reported it as the lever that made the budget work. It then became 16.7 ms
+here, one step for each frame, and every capacity figure in this logbook was computed on it.
+
+One body is not a crowd. A single body in contact with a floor has a handful of constraints
+and forgives a long step. Forty bodies pressing on each other share one coupled solve, and
+what a long step does there is fail to resolve penetration, then correct it violently the
+next step. That correction is the teleporting.
+
+The general form is worth keeping: **a stability result measured on one of a thing does not
+transfer to many of them in contact.** The same mistake appeared earlier with solver
+iterations, where iterations looked free on a barely-touching musculoskeletal body and turned
+out to matter for a crowd.
+
+### What it costs
+
+5490 microseconds for 40 bodies is **137 microseconds for a body for a frame**, against the 55
+this logbook has been using.
+
+| | people for one core, physics at half the tick | always-on for 15 dollars |
+| --- | --- | --- |
+| 16.7 ms, unstable, as budgeted | 151 | 80 |
+| **8.3 ms, stable** | **60** | **57** |
+
+Capacity falls by 60 percent. The 15 dollar figure falls less, from 80 to 57, because egress
+is most of that bill and the wire did not change.
+
+The model default is now 8.3 ms with two substeps.

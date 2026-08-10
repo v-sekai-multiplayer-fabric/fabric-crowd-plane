@@ -18,6 +18,13 @@ TICK_US = 16666
 
 
 def venue(n, spacing=0.75, iters=10, islands=True):
+    """A room of n avatars in ONE model, so contact between them is solved once.
+
+    The timestep is 8.3 ms and not 16.7. A single body is stable at 16.7 and a crowd in
+    contact is not: at that step the solver loses a metre of penetration, ejects bodies at
+    velocities near 10^7, and goes NaN in about five seconds. Halving it fixes all three.
+    The frame runs two substeps to stay at 60 Hz. See docs/logbook/body.md.
+    """
     bodies, acts = [], []
     side = max(1, int(np.ceil(np.sqrt(n))))
     for i in range(n):
@@ -29,11 +36,20 @@ def venue(n, spacing=0.75, iters=10, islands=True):
         acts.append(re.sub(r'joint="([a-z_]+)"',
                            lambda m: 'joint="%s_%d"' % (m.group(1), i), ACT))
     flag = '<flag island="enable"/>' if islands else ''
-    # The offscreen framebuffer defaults to 640x480, so a renderer asking for more fails.
-    # It is a property of the model, not of the renderer, which is easy to miss.
+    # Two sizes that are properties of the MODEL, not of the caller, and both bite silently.
+    #
+    # `memory` is the constraint arena. Left at its default, a crowd this size overflows it,
+    # MuJoCo raises mjWARN_CONTACTFULL, and then it DROPS CONTACTS. Bodies pass into each
+    # other, the solver tries to fix a metre of penetration at once, and the result is
+    # teleporting and eventually NaN. A dropped contact does not announce itself in the
+    # motion; it looks like bad physics.
+    #
+    # `offwidth`/`offheight` size the offscreen framebuffer, which defaults to 640x480, so an
+    # offscreen renderer asking for more fails.
     return ('<mujoco model="venue"><compiler angle="radian"/>'
+            '<size memory="512M"/>'
             '<visual><global offwidth="1920" offheight="1080"/></visual>'
-            '<option timestep="0.016666" solver="Newton" iterations="%d">%s</option>'
+            '<option timestep="0.008333" solver="Newton" iterations="%d">%s</option>'
             '<default><geom type="capsule" condim="3" friction="0.9 0.005 0.0001" density="985"/>'
             '<joint type="hinge" damping="2" armature="0.02"/>'
             '<motor ctrlrange="-150 150"/></default>'
