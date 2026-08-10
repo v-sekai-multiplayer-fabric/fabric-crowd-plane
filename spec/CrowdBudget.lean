@@ -1117,19 +1117,38 @@ theorem per_cell_encoding_is_430_times_less :
       2 iterations   24.13 us   130 METRES          1136
       1 iteration    17.36 us   960 metres          1478
 
-   Below four the contact solve stops converging and bodies pass through the floor and each
-   other. Nothing is reported as an error: `qpos` stays finite and the simulation runs, which
-   is the part worth remembering. The failure is silent and only a penetration check finds
-   it.
+   So the lever works, and it works at exactly one setting. Four iterations holds 1075 on two
+   cores, which clears a thousand. Two iterations holds 1136 and puts bodies 130 metres
+   through the floor.
 
-   This is the same measurement that said iterations were free on the musculoskeletal body,
-   and it said that because a barely-touching body has nothing to solve. A crowd pressing
-   together does. The earlier result was true and did not generalise. -/
+   The cliff between them is a factor of a thousand in penetration for a factor of 1.07 in
+   people, and four sits one step above it. That is the whole finding. It is not a knob with
+   a gentle slope to tune down; it is a step, and the step is between four and two.
 
+   Nothing is reported as an error on the far side of it. `qpos` stays finite and the
+   simulation keeps running. Only a penetration check finds it, which is why one is in the
+   bench and should stay in whatever ships.
+
+   This is also the same measurement that said iterations were free on the musculoskeletal
+   body, and it said that because a barely-touching body has nothing to solve. A crowd
+   pressing together does. The earlier result was true and did not generalise.
+
+   The honest reservation is that 1200 frames of 60 newton-metre sinusoids on every actuator
+   is a violent test, and it puts 90 millimetres of penetration on the safe setting too. It
+   ranks the settings and it does not certify any of them. A crowd walking is gentler, and
+   the number that decides this is penetration under crowd load, which the plane does not
+   produce yet. -/
+
+/-- The measured floor. Four converges, two does not, and there is nothing in between. -/
 def iterationsFloor : Nat := 4
 
-theorem cutting_iterations_does_not_reach_a_thousand :
-    16666000 / (2433 + (45 + 280 + 25820) / 2) < people := by native_decide
+/-- Four iterations on two cores clears a thousand, with 7 percent to spare. -/
+theorem four_iterations_reaches_a_thousand_on_two_cores :
+    16666000 / (2433 + (45 + 280 + 25820) / 2) = 1075 := by native_decide
+
+/-- And ten iterations does not, which is why this was worth measuring. -/
+theorem ten_iterations_does_not :
+    16666000 / (2433 + (45 + 280 + 26090) / 2) < people := by native_decide
 
 /-- The shipped wire: order-1 context coding, 21 bytes of muscle deltas plus a root position,
     at 20 Hz for the bodies within touching distance. Distant bodies send a root position at
