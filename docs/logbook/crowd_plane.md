@@ -202,3 +202,24 @@ the venue machine goes from needing six to needing seven of the eight it buys.
 
 Nothing about the design was wrong. The arithmetic held and the constant was measured on a
 machine nobody deploys to.
+
+## Two machines, two answers
+
+The run above was repeated on a second `performance-2x` in `sjc`, same image, same
+settings, a different machine.
+
+| machine | median us | p90 us | people on 3 vCPU at p90 |
+| --- | --- | --- | --- |
+| `2870276b497228` | 46.37 | 52.56 | 830 |
+| `d890411b973d18` | 53.85 | 65.74 | 681 |
+
+25 percent apart on the tail, from the same image on the same size in the same region. This
+is shared tenancy, and it is a larger effect than any tuning measured on the desk.
+
+So a single run does not size a plane here. What sizes it is the worst machine the platform
+will hand out, and two samples do not bound that either. The design number stands at the
+worse of the two until a wider sample exists.
+
+That also puts a floor under how much of this can be answered by benchmarking at all. A
+plane that must hold 60 Hz on a machine it cannot choose has to degrade rather than assume,
+which is an admission-control question and not a physics one.
