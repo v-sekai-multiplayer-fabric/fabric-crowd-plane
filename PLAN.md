@@ -24,7 +24,7 @@ that enforces it.
 
 ## What is measured, and where
 
-All figures are on the hardware that would run it. `docs/logbook/crowd_plane.md` holds the
+All figures are on the hardware that would run it. `docs/logbook/` holds the
 apparatus for each.
 
 | quantity | value | where |
@@ -82,5 +82,5 @@ freedom humanoid is a real problem and not a gain to tune.
 
 Airlocks, cross-machine interest fanout, and per-tick state between machines. A touchable
 crowd is one contact solve on one machine, so a venue larger than one machine cannot share
-the only feature worth selling. `docs/logbook/crowd_plane.md` records why the airlock was
+the only feature worth selling. `docs/logbook/crowd.md` records why the airlock was
 retired after being designed.
