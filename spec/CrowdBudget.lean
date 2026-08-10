@@ -9,8 +9,15 @@
 
    Then the measurements arrived and moved almost every constant in it, which is the better
    argument for the file. The joint count fell from an assumed 206 to a measured 36. The
-   body cost went from 500 to 4075 to 950 as the model and the variant were pinned down.
-   Contact moved off one engine onto another. Steering came in 40 percent over its guess.
+   body cost went from 500 to 4075 to 950 to 433 as the model, the variant, the timestep,
+   and finally the batch size were pinned down. Contact moved off one engine onto another.
+   Steering came in 40 percent over its guess.
+
+   The last of those moves is the one worth pausing on. The body did not get faster; the
+   measurement got honest. A body measured alone costs 258 microseconds and a body measured
+   in a full plane costs 433, and the first number was quoted for a while as though it were
+   the second. A budget file cannot catch that on its own. It can only make the correction
+   cheap once someone notices, which is what happened here.
 
    Every theorem was rechecked each time, and nobody had to remember which figures depended
    on which. Nothing in this file is assumed any more.
@@ -80,10 +87,25 @@ def steerUs : Nat := 280
     threads all land within 4 percent of each other. -/
 def contactUs : Nat := 2433
 
-/-- MEASURED. One locomotion body advanced through one 60 Hz frame on one core. Muscle
-    dynamics do need the 2 millisecond timestep, so a frame is eight substeps here. The
-    full 700-muscle model costs 4075. -/
-def bodyFrameUs : Nat := 950
+/-- MEASURED, and it is the at-scale cost, not the single-body cost.
+
+    One locomotion body alone advances a frame in 258 microseconds. The same body inside a
+    batch of 28 costs 433. Nothing about the body changed. The models share one MjModel and
+    each carries its own MjData, so what grew is the working set, and past about 14 bodies a
+    core is waiting on memory rather than computing. The cost per body then stops rising:
+    14, 28, and 56 all land within 5 percent of each other.
+
+    Quoting the single-body figure for a plane full of bodies overstates the answer by 1.7
+    times. This constant is the one a plane actually pays.
+
+    A frame is two substeps at an 8 millisecond timestep. That timestep is the only lever
+    that moved: 2 ms costs 981 microseconds a frame, 4 ms costs 498, and 8 ms costs 255 for
+    a single body, a 3.8-fold spread. Driven at full muscle load for 10 simulated seconds,
+    every one of those timesteps stayed stable and warned about nothing.
+
+    Solver iterations are not a lever. 100, 50, 20, 10, and 5 iterations all cost the same
+    to within a percent, because a body barely in contact has almost nothing to solve. -/
+def bodyFrameUs : Nat := 433
 
 def biomechUs : Nat := tickUs - publishUs - steerUs - contactUs
 
@@ -104,22 +126,69 @@ def planesFor (stepUs : Nat) : Nat :=
   let n := bodiesPerPlane stepUs
   if n = 0 then people else (people + n - 1) / n
 
-/-- THE ANSWER. Fourteen bodies for each plane, every figure in it measured. -/
-theorem bodies_measured : bodiesPerPlane bodyFrameUs = 14 := by native_decide
-theorem planes_measured : planesFor bodyFrameUs = 72 := by native_decide
+/-- THE ANSWER. Thirty-two bodies for each plane, every figure in it measured. -/
+theorem bodies_measured : bodiesPerPlane bodyFrameUs = 32 := by native_decide
+theorem planes_measured : planesFor bodyFrameUs = 32 := by native_decide
 
 /-- Eight cores carry more than a hundred bodies, so a venue of a hundred people needs no
     approximation at all. Every one of them is a real musculoskeletal body. -/
 theorem eight_cores_clear_a_hundred : 8 * bodiesPerPlane bodyFrameUs > 100 := by native_decide
 
-/-- A thousand does not fit one machine. Seventy-two planes is seventy-two cores, and the
-    bus is shared memory, so a venue cannot be split across machines. -/
+/-- A thousand does not fit one machine. Thirty-two planes is thirty-two cores, and the bus
+    is shared memory, so a venue cannot be split across machines. -/
 theorem a_thousand_needs_more_than_sixteen_cores : planesFor bodyFrameUs > 16 := by
   native_decide
+
+/-- The single-body cost would have promised 53 bodies for each plane. Believing it would
+    have sized the fleet at 0.6 of what the crowd needs, and the shortfall would only appear
+    once a plane was full. -/
+def singleBodyFrameUs : Nat := 258
+
+theorem the_single_body_figure_overpromises :
+    bodiesPerPlane singleBodyFrameUs = 53 := by native_decide
 
 /-- A body costing the whole tick leaves room for exactly one, which is the point at which
     the biomechanics layer stops being the crowd and becomes a sample of it. -/
 theorem one_body_at_the_whole_tick : bodiesPerPlane biomechUs = 1 := by native_decide
+
+/- ## The levers that are spent
+
+   A constant this file cannot lower is worth recording, because the next reader will
+   otherwise spend the same day rediscovering it. Each figure below is the at-scale cost of
+   a body with something removed from it, in microseconds for each step. -/
+
+def stepBaselineUs : Nat := 217
+def stepNoMarginUs : Nat := 212
+def stepNoMeshCollisionUs : Nat := 215
+def stepNoContactUs : Nat := 199
+def stepNoActuationUs : Nat := 210
+def stepNoContactNoActuationUs : Nat := 193
+
+/-- Only 19 geoms in the locomotion model collide: one plane, four meshes, and fourteen
+    capsules. The other 330 are visual. So the mesh collision everyone reaches for first is
+    worth about one percent, and swapping those meshes for primitives buys nothing. -/
+theorem meshes_are_not_the_cost :
+    (stepBaselineUs - stepNoMeshCollisionUs) * 100 / stepBaselineUs = 0 := by native_decide
+
+/-- Deleting every contact in the model saves 8 percent. -/
+theorem contact_is_eight_percent :
+    (stepBaselineUs - stepNoContactUs) * 100 / stepBaselineUs = 8 := by native_decide
+
+/-- Deleting the contacts and the hundred muscles together saves 11 percent. The 193
+    microseconds left is smooth dynamics over 36 degrees of freedom, which is the part that
+    cannot be removed while the thing stays a body. -/
+theorem everything_removable_is_eleven_percent :
+    (stepBaselineUs - stepNoContactNoActuationUs) * 100 / stepBaselineUs = 11 := by
+  native_decide
+
+/-- MJX, MuJoCo's JAX backend, on one CPU core. Batching does amortize, from 11509
+    microseconds for each body at a batch of one down to 2177 at a batch of 64, but it
+    starts so far behind that the asymptote never reaches the C engine. It is built to run
+    thousands of environments on a GPU. It also needs the mesh margins zeroed before it will
+    load this model at all, and about 25 seconds of compilation for each batch shape. -/
+def mjxBestStepUs : Nat := 2177
+
+theorem mjx_is_ten_times_slower : mjxBestStepUs / stepBaselineUs = 10 := by native_decide
 
 /- ## Skeleton level of detail
 
