@@ -4,9 +4,13 @@
    measurement replaces an assumption, the constant changes and these either still hold or
    fail loudly, which is the whole reason the budget is not a comment.
 
-   Two errors were caught by writing it this way rather than in a calculator: the tick is
-   16666 microseconds and not 16667, and the crowd is 23 times the recorded traffic peak
-   and not 24.
+   Writing it this way caught two arithmetic errors before any code existed: the tick is
+   16666 microseconds and not 16667, and a rounding slip in the density ratio.
+
+   Then the gate measurement caught two more, which is the better argument for the file.
+   MS-Human-700 has 85 joints and not the 206 bones of a human skeleton, and one body costs
+   4075 microseconds for a frame rather than the 500 assumed. Both numbers moved, both sets
+   of theorems were rechecked, and nothing had to be remembered.
 
    Integers throughout. No Mathlib. Proofs are native_decide. -/
 namespace Crowd
@@ -32,17 +36,21 @@ def people : Nat := 1000
 
 /-- A musculoskeletal human is not one entity carrying a pose. It is one entity for each
     joint, which is why weft's 100-byte packet fits unchanged: it never has to describe a
-    whole body in its 6 bytes of rotation. -/
-def joints : Nat := 206
+    whole body in its 6 bytes of rotation.
+
+    MEASURED. MS-Human-700 reports 81 bodies, 85 joints, 85 degrees of freedom, 700
+    actuators, and 700 tendons. The 700 is muscles, not joints. A human skeleton has 206
+    bones, and that is a different count from the model's articulation. -/
+def joints : Nat := 85
 
 def entities : Nat := people * joints
 
-theorem entities_is_206000 : entities = 206000 := by native_decide
+theorem entities_is_85000 : entities = 85000 := by native_decide
 
 /-- The densest thing weft has run is a recorded traffic trace. -/
 def recordedPeak : Nat := 8637
 
-theorem denser_than_the_recording : entities / recordedPeak = 23 := by native_decide
+theorem denser_than_the_recording : entities / recordedPeak = 9 := by native_decide
 
 /- ## The tick budget
 
@@ -55,13 +63,18 @@ def publishUs : Nat := entities * publishPsEach / 1000000
 /-- Assumed. Ten neighbours for each agent at 20 ns a pair. -/
 def steerUs : Nat := 200
 
-/-- Assumed, and the first thing to replace with a measurement after the gate. -/
+/-- Assumed, and the next thing to replace with a measurement. -/
 def contactUs : Nat := 2000
+
+/-- MEASURED. One MS-Human-700 body advanced through one 60 Hz frame on one core.
+    509.4 microseconds for each `mj_step`, median of nine runs of two hundred, and the
+    model's timestep is 2 milliseconds, so a frame is eight substeps. -/
+def bodyFrameUs : Nat := 4075
 
 def biomechUs : Nat := tickUs - publishUs - steerUs - contactUs
 
-theorem publish_costs_257 : publishUs = 257 := by native_decide
-theorem biomech_gets_14209 : biomechUs = 14209 := by native_decide
+theorem publish_costs_106 : publishUs = 106 := by native_decide
+theorem biomech_gets_14360 : biomechUs = 14360 := by native_decide
 
 /-- The layers other than biomechanics fit the tick with room left. If this ever fails,
     the crowd cannot hold 60 Hz whatever the biomechanics costs. -/
@@ -77,13 +90,15 @@ def planesFor (stepUs : Nat) : Nat :=
   let n := bodiesPerPlane stepUs
   if n = 0 then people else (people + n - 1) / n
 
-theorem bodies_at_100us : bodiesPerPlane 100 = 142 := by native_decide
-theorem bodies_at_500us : bodiesPerPlane 500 = 28 := by native_decide
-theorem bodies_at_2000us : bodiesPerPlane 2000 = 7 := by native_decide
-theorem bodies_at_5000us : bodiesPerPlane 5000 = 2 := by native_decide
+/-- THE ANSWER. Three bodies for each plane, at the measured cost. -/
+theorem bodies_measured : bodiesPerPlane bodyFrameUs = 3 := by native_decide
+theorem planes_measured : planesFor bodyFrameUs = 334 := by native_decide
 
-theorem planes_at_500us : planesFor 500 = 36 := by native_decide
-theorem planes_at_5000us : planesFor 5000 = 500 := by native_decide
+/-- So biomechanics is a sample of the crowd and not the crowd. Three bodies in a thousand
+    is the shape the measurement forces, and no amount of engineering in the other layers
+    changes it. -/
+theorem biomechanics_is_a_sample : bodiesPerPlane bodyFrameUs * 100 < people := by
+  native_decide
 
 /-- A body costing the whole tick leaves room for exactly one, which is the point at which
     the biomechanics layer stops being the crowd and becomes a sample of it. -/
@@ -104,14 +119,14 @@ def entitiesAtLod (farJoints : Nat) : Nat := nearBodies * joints + farBodies * f
 def ringPerSecond (farJoints : Nat) : Nat := entitiesAtLod farJoints * publishHz
 
 theorem lod_full : entitiesAtLod joints = entities := by native_decide
-theorem lod_24 : entitiesAtLod 24 = 38560 := by native_decide
-theorem lod_8 : entitiesAtLod 8 = 23840 := by native_decide
-theorem lod_root : entitiesAtLod 1 = 17400 := by native_decide
+theorem lod_24 : entitiesAtLod 24 = 28880 := by native_decide
+theorem lod_8 : entitiesAtLod 8 = 14160 := by native_decide
+theorem lod_root : entitiesAtLod 1 = 7720 := by native_decide
 
-/-- Level of detail is worth having: dropping distant bodies to 24 joints cuts the ring
-    traffic by more than five times. This is the argument for interest management stated as
-    a number rather than an opinion. -/
-theorem lod_24_cuts_traffic_fivefold : entities / entitiesAtLod 24 = 5 := by native_decide
+/-- Level of detail still pays, and less than it did at the assumed joint count: dropping
+    distant bodies to the root cuts ring traffic elevenfold. -/
+theorem lod_root_cuts_traffic_elevenfold : entities / entitiesAtLod 1 = 11 := by
+  native_decide
 
 /- ## The ring
 
@@ -123,12 +138,12 @@ def measuredAppliesPerSecond : Nat := 41200000
 def ringPercentOfCore (farJoints : Nat) : Nat :=
   ringPerSecond farJoints * 100 / measuredAppliesPerSecond
 
-theorem full_skeletons_cost_a_tenth_of_a_core : ringPercentOfCore joints = 10 := by
+theorem full_skeletons_cost_four_percent_of_a_core : ringPercentOfCore joints = 4 := by
   native_decide
 
 /-- Publishing every simulation tick instead of every third would triple it. Splitting the
-    two clocks is what keeps this affordable. -/
-theorem publishing_every_tick_would_cost_thirty_percent :
-    entities * simHz * 100 / measuredAppliesPerSecond = 30 := by native_decide
+    two clocks is what keeps this cheap. -/
+theorem publishing_every_tick_would_cost_twelve_percent :
+    entities * simHz * 100 / measuredAppliesPerSecond = 12 := by native_decide
 
 end Crowd
