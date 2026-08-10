@@ -328,3 +328,59 @@ thousand players is 35 MB/s inbound, which is a fraction of what the venue alrea
 out. Ingress is not billed on the platform, so it costs machine time rather than money, and
 the machine time is the edge decoding it, which remains the one unmeasured term in the
 topology.
+
+## Composing whatever the player is wearing
+
+Every player brings a different rig. A headset alone is three degrees of freedom at the head.
+Add controllers and it is three points. Add a waist and feet and it is six. Add elbows and
+knees and it is eleven. Then face tracking and eye tracking arrive, and they are not joints
+at all.
+
+A policy trained on a fixed six-point rig cannot take three, and retraining one policy for
+each combination is not a design. The requirement is composition: any subset, gracefully.
+
+### The body: MaskedMimic already is this
+
+`data/pretrained_models/masked_mimic/smpl` is a controller whose model card describes it as
+producing "physically simulated motion while conditioning on **sparse or masked** future body
+targets", for a 24-body SMPL humanoid with 69 actions, trained on AMASS. That is the
+requirement stated as a method: mask out the targets a player does not have, and the policy
+inpaints the rest physically.
+
+It is the third controller in this repository and the right one for tracked players, where
+the other two are for something else:
+
+| controller | what drives it | who it is for |
+| --- | --- | --- |
+| steering | a direction and a speed | a player on a stick, and every unattended body |
+| motion tracker | a full set of body targets | a fully tracked player |
+| **masked mimic** | **any subset of targets** | **every real player, because rigs differ** |
+
+The steering policy under training is still needed, because a body with no trackers at all
+still has to walk. The two compose: steering supplies where to go, masked targets supply what
+the tracked parts are doing.
+
+### The face and the eyes are not physics
+
+Blendshapes and gaze do not go through a controller. Nothing about a smile is dynamic, and
+routing it through a policy would be inventing work. They are a separate channel: measured on
+the client, published as data, applied on the other client. The physics never sees them.
+
+That separation also makes them cheap. Blendshapes and gaze sit in a bounded range and 8 bits
+covers them, and a face does not need 60 Hz.
+
+| channel | params | rate | kB/s |
+| --- | --- | --- | --- |
+| ARKit-style blendshapes | 52 | 30 Hz | 1.56 |
+| eye gaze, lid, pupil | 8 | 30 Hz | 0.24 |
+| body, 11-point tracking | 77 | 60 Hz | 35.0 |
+
+The whole face costs a twentieth of the body. It is worth stating because the intuition runs
+the other way: faces feel expensive because they look expensive, and they are 1.8 kB a second.
+
+### What this changes
+
+The plane gains a second input path that bypasses the controller entirely, and the wire gains
+a channel that is not joint rotations and does not compress like them. Neither is costed in
+`wire.md`, which measures body pose only, and both should be before the topology is called
+settled.
