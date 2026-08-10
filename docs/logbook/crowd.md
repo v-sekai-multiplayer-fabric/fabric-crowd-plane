@@ -180,3 +180,37 @@ today, and the prototype of the replicated store, `Weft.Actor.Store.Replicated` 
 `.Replicator`, was deleted because CI kept failing on it. That deletion was about a flaky
 test rather than a wrong design, which is worth remembering before rebuilding it from
 scratch.
+
+## The doorway, built
+
+`proto/airlock.py`. A crossing is a small state machine: open, sealed, arriving.
+
+    0.00s  sealed with 3
+    0.00s  bound to room-33
+    3.41s  far side ready and state flushed
+    5.01s  held 1.59s so the walk covers the wake
+    5.01s  3 admitted to room-33
+
+Three things it gets right, and each is a measurement rather than a preference.
+
+**The wake and the flush overlap.** Waking a stopped machine is 3.4 seconds, measured over
+three restarts, and a planned flush is a fraction of that. Run in parallel they cost 3.41
+rather than 3.55 in series, because nothing about one waits on the other.
+
+**The walk is longer than the wake, on purpose.** A five second transit covers a 3.4 second
+wake with 1.6 seconds spare. If the transit finished first the player would stand in a sealed
+room waiting for a machine, which is the freeze the doorway exists to hide. So the minimum
+transit is not a feel decision: it is the measured wake plus margin.
+
+**The destination is bound while the batch is inside**, not when the doorway was built. A room
+needs one doorway rather than one for each place it connects to, which is the whole reason
+this shape was worth keeping after the first design was retired.
+
+### What it does not do yet
+
+The `place`, `wake`, and `flush` calls are seams with defaults that sleep for the measured
+durations. Wiring them means the control plane choosing a machine, Fly starting it, and
+`Weft.Actor` writing to disk, and the last of those is the code deleted in #96.
+
+So the doorway is real and what it opens onto is simulated. That is the honest state, and it
+is the right order: the timing budget is the part that could have been wrong, and it is not.
