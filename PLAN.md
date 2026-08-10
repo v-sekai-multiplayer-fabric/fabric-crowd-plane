@@ -31,9 +31,9 @@ apparatus for each.
 | --- | --- | --- |
 | one body, one frame, in a real 60 Hz loop on Fly | 55 us | measured |
 | concurrent bodies, one core, physics at half the tick | about 139 | measured |
-| wire, one body, one frame | 21 bytes | measured |
-| person-hours for 15 dollars a month | about 43000 | derived |
-| the same, as always-on players | about 59 | derived |
+| wire, one body, one frame, as fabric packets | 108 bytes | measured |
+| person-hours for 15 dollars a month | about 17500 | derived |
+| the same, as always-on players | about 24 | derived |
 | a room that wakes from stopped to its first tick | 3.4 s | measured |
 
 The venue is **one Fly machine, `shared-cpu-2x` with 1 GB**, stopped whenever it is empty,
@@ -47,9 +47,12 @@ missed tick in 36000 against none. Dedicated buys a tighter tail and costs 5.6 t
 earlier draft of this plan bought it on the strength of a 237 millisecond figure that turned
 out to be a machine running at 99 percent rather than a machine being shared.
 
-**Egress is now most of the bill.** At the lean wire it is 65 percent of the cost of a
-person-hour and the machine is the rest, so the next optimisation is bytes and not cycles.
-Halving the wire again is worth more than any remaining physics work.
+**Egress is now nearly the whole bill.** The wire is `XRGridEntityPacket` from
+`lean-entity-packet`, which the crowd plane speaks rather than inventing its own, and which
+costs 108 bytes for a body once compressed against 21 for a body-oriented encoding. That is
+deliberate: one format, one conformance test, one already-verified decoder, at the price of
+24 always-on players rather than 59. Egress is then 89 percent of a person-hour, so no
+remaining physics work changes the bill.
 
 ## What is built
 

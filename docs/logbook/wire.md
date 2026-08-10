@@ -137,3 +137,46 @@ That is the argument for the golden vectors existing. A summary of a format is n
 format, and this book has now been caught twice in one day working from summaries: once here
 and once when a wire format was measured from scratch while a specified one sat in the
 organisation with proofs attached.
+
+## DECIDED: the wire is the org packet, and it costs 2.5 times the capacity
+
+`bench/wire_packet_stream.py`, real simulated motion, 13 joints a body, one 100-byte
+`XRGridEntityPacket` for each joint:
+
+| form | B/body/frame |
+| --- | --- |
+| packets raw | 1300 |
+| through zstd | 277 |
+| delta the varying fields, then zstd | 195 |
+| entropy floor of those deltas | 108 |
+| the body-oriented form measured earlier | 21 |
+
+Five times the body-oriented form at the floor, and it is not a compression failure. The
+packet carries an absolute int64 position for **each joint**: three independent eight-byte
+coordinates that all move every frame, when a skeleton derives every one of them from its
+parent's rotation and a bone length that never changes. A coder removes redundancy, and
+independent positions are not redundant.
+
+What that costs, at 4 near bodies at 20 Hz and 70 far at 1:
+
+| wire | kB/s | egress share | always-on for 15 dollars |
+| --- | --- | --- | --- |
+| body-oriented, 21 B | 3.5 | 73 percent | 59 |
+| **packet floor, 108 B** | **10.4** | **89** | **24** |
+| packet delta and zstd, 195 B | 17.4 | 93 | 15 |
+
+**The decision is to accept it.** 24 always-on rather than 59.
+
+Three options were on the table. Diverge for skeletons and keep 59, at the cost of the crowd
+plane no longer speaking the format the rest of the fabric speaks. Extend the packet with a
+skeleton class whose position is derived rather than sent, which is the technically better
+answer and is a change to a spec repository owned elsewhere. Or accept the packet as it
+stands.
+
+Accepting buys one format, one conformance test, one decoder already verified in C++, and no
+negotiation. It costs 35 always-on players at the 15 dollar tier. That is the trade, taken
+deliberately, and the extension stays available if the number ever matters more than the
+simplicity.
+
+One caveat on the figure: this measured 13 joints a body, and the crowd budget assumes 36. A
+36-joint body makes the packet form proportionally worse, so 24 is the optimistic end.
