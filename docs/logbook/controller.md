@@ -194,6 +194,19 @@ a policy trained in a simulator we do not run is a policy we cannot change. The 
 wrong is bounded: if Newton to MuJoCo does not transfer, the fallback is domain randomisation
 in Newton, which is the same work as the IsaacLab route without the second engine.
 
+## RESULT: the 15 to 20 minute prediction held
+
+Training started at 12:09 and the last checkpoint was written at 12:28:43. **19.7 minutes**
+for 500 iterations, against a prediction of 15 to 20 made at epoch 27.
+
+The rate stayed flat at about 26 epochs a minute from epoch 27 to the end. The hypothesis
+said a run that slowed down would be the good sign, because episodes lengthen once a policy
+stops falling over immediately. It did not slow down, so the timing was easy to predict and
+the policy probably did not learn much. Finishing on time is not the same as succeeding, and
+the reward curve is the thing to read next.
+
+Checkpoints are at `results/soma_steer/last.ckpt` (173 MB) and `score_based.ckpt`.
+
 ## HYPOTHESIS: 500 iterations in 15 to 20 minutes
 
 Recorded while it runs, so the estimate cannot be revised after the fact.
@@ -288,3 +301,37 @@ can do, so a different code generator competes with a well-tuned GEMM rather tha
 something naive. Slang earns its place if the plane ever runs on a GPU, or if the policy is
 quantised to int8, where a hand-written kernel can beat a generic library. Both are
 measurements nobody has taken.
+
+## Quantising the policy: 4 bit is the wrong lever for this shape
+
+A 1024 by 512 actor is 0.97 M parameters. That is 3.87 MB in fp32, 0.97 in int8, and 0.48 in
+int4, against activations of 0.61 MB for 150 bodies. Every one of those fits in cache.
+
+So this workload is not memory bound. Arithmetic intensity for a 150-row batch is about 75
+FLOP for each byte of weight loaded, which is far above the point where a CPU stops waiting on
+memory and starts waiting on its own arithmetic. Quantisation helps a memory bound problem by
+moving fewer bytes, and helps a compute bound one only if the machine has instructions that
+multiply the smaller type faster.
+
+**No CPU has a 4 bit matmul instruction.** A 4 bit model is unpacked to int8 before anything
+multiplies it, so int4 runs at int8 speed and merely stores smaller. Storage is not the
+problem here.
+
+int8 is a different matter, and it depends on the host. The desk machine is a Ryzen 3800X
+with AVX2 and no VNNI, so int8 buys little there. A Zen 4 EPYC has AVX-512 with VNNI and
+would give something like 4 times. The Fly host reports itself only as "AMD EPYC" with no
+model, so whether the target has VNNI is **unknown and worth one command to find out**.
+
+Ranked by what is certain:
+
+| lever | factor | certainty |
+| --- | --- | --- |
+| narrow 1024x512 to 256x128 | 2.4x | measured |
+| run control at 20 Hz over 60 Hz physics | 3x | measured |
+| int8 with VNNI | maybe 4x | unverified, host unknown |
+| int4 | about 1x for speed | argued above |
+
+The first two multiply to about 7 times and take the policy from 94 percent of a tick to 14.
+They are also the two that cost something real: a narrow policy may not learn the task, and a
+policy thinking at 20 Hz reacts late to a shove, which is the one thing this product sells.
+Quantisation costs accuracy instead, which is a different currency and a smaller bill.
