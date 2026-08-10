@@ -600,3 +600,38 @@ Train in Newton, deploy in MuJoCo, because same-engine transfer is the cheap one
 a policy trained in a simulator we do not run is a policy we cannot change. The cost of being
 wrong is bounded: if Newton to MuJoCo does not transfer, the fallback is domain randomisation
 in Newton, which is the same work as the IsaacLab route without the second engine.
+
+## HYPOTHESIS: 500 iterations in 15 to 20 minutes
+
+Recorded while it runs, so the estimate cannot be revised after the fact.
+
+Training started at 12:09 and reached epoch 27 by 12:10:04. Each epoch reports collecting in
+about 1 second and optimising in under 1, so the observed rate is roughly 20 to 25 epochs a
+minute for 2048 environments of SOMA-23 on the 4090.
+
+At that rate 500 iterations finishes in **15 to 20 minutes**, and the run should be done
+around **12:25 to 12:30**.
+
+This replaces the estimate given before any iteration had run, which was one hour, and which
+was a guess with no measurement under it. The correction is a factor of three or four, in the
+optimistic direction.
+
+### What would falsify it
+
+The rate is measured over the first 27 epochs, which are the cheapest. Two things could slow
+it down and neither is visible yet.
+
+Episodes lengthen as the policy stops falling over immediately, so collection gets more
+expensive as the policy improves. A run that ends at 40 minutes rather than 20 has probably
+learned something, which makes overrunning this estimate a good sign rather than a bad one.
+
+The log repeats `opt.ccd_iterations, currently set to 200, needs to be increased`, which is
+continuous collision detection failing to converge. If that is raised to fix contact quality,
+every step gets dearer and this estimate goes with it.
+
+### What the run does not settle
+
+Finishing is not succeeding. 500 iterations was chosen as enough to see whether the policy
+learns at all, not as a budget known to produce a controller. If it walks badly at 500, the
+answer is more iterations, and this timing estimate is then the unit of cost for that
+decision rather than the answer to it.
