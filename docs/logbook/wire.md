@@ -273,3 +273,47 @@ the latency the product exists to sell.
 
 So the number stands at **24 to 26 always-on for 15 dollars**, and this line of work is
 finished: the wire is as small as it gets without spending the thing being sold.
+
+## Squeezing the packet without changing the packet
+
+Every tactic here is a transport transform: reversible, invisible to the schema, and the
+decoder still hands the application the packets the encoder was given. `bench/wire_codec_tactics.py`.
+
+| tactic | B/body/frame |
+| --- | --- |
+| temporal delta of the absolute position | 111.2 |
+| plus spatial decorrelation, joint minus root | 111.1 |
+| plus joint offsets quantised to millimetres | 88.1 |
+| plus an order-1 context model | **76.9** |
+
+**Spatial decorrelation bought nothing, and that is the useful result.** Subtracting the root
+before delta-coding looked obvious: every joint's absolute position carries the body's global
+translation, so removing it should collapse the entropy. It does not, because the temporal
+delta has already removed it. The delta of an absolute position and the delta of a
+root-relative position differ only by the root's own delta, which is a few hundred
+micrometres. The first transform had already taken what the second was reaching for.
+
+The two that worked are unglamorous. Joint offsets do not need micrometre precision, and a
+millimetre is invisible on a limb, which is 21 percent. An order-1 model conditioning each
+value on its own previous delta is another 12.
+
+111 to 77 bytes, a 1.44 times squeeze, no schema change, no negotiation.
+
+### What is left, and why it stays
+
+77 bytes against 21 for a body-oriented encoding is still 3.7 times, and the residue is not
+compressible. The packet stores a position for every joint: 39 int64 values for a body, which
+after every transform still carry real information, because a limb genuinely moves. The
+body-oriented form sends rotations and derives the positions from a skeleton, so it never
+pays for them at all.
+
+That gap is the price of the format decision, now measured rather than estimated. It buys 31
+always-on players rather than 26, and a body-oriented wire would buy 59.
+
+### A caution about this measurement
+
+An earlier version of this table read 10.4 bytes rather than 111, because the entropy was
+pooled across joints and counted once instead of summed over all 39 values in a body. The
+number was ten times too good and looked plausible. It was caught by comparing against the
+earlier packet measurement of 108, which is the argument for making a new measurement agree
+with an old one before believing it.
