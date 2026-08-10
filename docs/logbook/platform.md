@@ -274,8 +274,27 @@ deadline requires dedicated cores at eight times the price. The dedicated machin
 at 99 percent of its tick. This one is running at 22. Nothing about the machine class was
 being measured; headroom was.
 
-The comparison is not yet clean, because the two runs differ in load as well as in class. A
-dedicated run at 60 bodies is in flight and separates them.
+### The clean comparison, same load, same image, same region
+
+| | shared-cpu-2x | performance-2x |
+| --- | --- | --- |
+| work p50 | 3679 us | 3594 |
+| work p99 | 5171 | 4847 |
+| work max | 22918 | 8718 |
+| lateness p99 | 283.5 us | 231.6 |
+| lateness max | 19435 | 12526 |
+| **missed ticks** | **1 of 36000** | **0 of 36000** |
+
+At 22 percent load the two machine classes are **the same machine** for this purpose. The
+median differs by 2 percent and the p99 by 7. Dedicated is better only in the tails: the
+worst tick is 22.9 milliseconds against 8.7, and the worst late start is 19.4 milliseconds
+against 12.5. One tick was missed on shared and none on dedicated, out of thirty-six
+thousand.
+
+So dedicated buys a tighter tail and nothing else, and it costs 5.6 times. At a 15 dollar
+ceiling that is not a trade worth making. What it might be worth is insurance against
+unexpected load, since a shared core has less to give when something spikes, and the worst
+tick already runs 2.6 times longer there.
 
 ### What it costs if it holds
 
