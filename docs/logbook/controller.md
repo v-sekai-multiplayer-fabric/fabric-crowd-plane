@@ -228,3 +228,63 @@ Finishing is not succeeding. 500 iterations was chosen as enough to see whether 
 learns at all, not as a budget known to produce a controller. If it walks badly at 500, the
 answer is more iterations, and this timing estimate is then the unit of cost for that
 decision rather than the answer to it.
+
+## The policy is a tick cost, and nobody had costed it
+
+The budget has four layers: publish, steer, contact, and the body. A learned controller adds
+a fifth, and it is not small.
+
+The actor in `examples/experiments/steering/mlp.py` is an MLP from the observation to 1024,
+then 512, then 66 actions. Only the actor runs at deployment; the critic and the
+discriminator are training only. MEASURED on one CPU core, fp32 through BLAS, 150 bodies with
+a 400-wide observation, which is the shape a deployed plane would run:
+
+| hidden | us/frame | us/body | share of a 16666 us tick |
+| --- | --- | --- | --- |
+| 1024 x 512 | 15747 | 104.98 | **94.5 percent** |
+| 512 x 256 | 10201 | 68.01 | 61.2 |
+| 256 x 128 | 6506 | 43.38 | 39.0 |
+| 128 x 64 | 3962 | 26.42 | 23.8 |
+
+At the shape ProtoMotions trains, **the policy costs more than the physics it steers**: 105
+microseconds a body against 55 for the body itself. A plane running it would spend 94 percent
+of its tick deciding what to do and have nothing left to do it in.
+
+The arithmetic is not surprising once written down. 150 bodies through 1024 by 512 is 290
+MFLOP a frame, which at 60 Hz is 17.4 GFLOP a second sustained, and that is most of one core.
+A dense matmul on a CPU is already near the machine's limit, so this is not an
+implementation problem to optimise away.
+
+Two levers, and they multiply.
+
+Narrow the network. 256 by 128 costs 39 percent of a tick instead of 94. Whether the task
+needs 1024 by 512 is unmeasured: that width was chosen for full-body motion tracking over the
+whole AMASS corpus, and steering on flat ground is a much smaller problem.
+
+Run it slower than the physics. A controller does not need to think at the rate the body
+integrates. Holding an action for two frames puts 256 by 128 at 20 percent of a tick, and for
+three frames at 14 percent. 20 to 30 Hz control over 60 Hz physics is ordinary in robotics.
+
+Together they take the fifth layer from 94 percent to about 14, which is affordable. Neither
+is free: a narrow policy may not learn the task, and a slow policy reacts late to a shove,
+which is the one thing this product sells.
+
+### The deployment path
+
+`protomotions/utils/export_utils.py` exports a policy to ONNX with `torch.onnx.export`, and
+`onnxruntime` is already a dependency of the MuJoCo extra. There is also a pretrained model
+named `g1-bones-deploy`, so the project intends deployment rather than only research.
+
+So the plane loads an ONNX actor and runs it with onnxruntime on the CPU, alongside MuJoCo.
+No PyTorch at runtime and no GPU. The measurements above are the budget that path has to fit.
+
+### Open question: ONNX to Slang to CPU
+
+The organisation has a Lean 4 to Slang pipeline that cross-compiles compute kernels to
+Vulkan, Metal, and a CPU backend. Whether an ONNX actor can be routed through it is not
+answered here, and the honest expectation is that it would not help on the target hardware.
+The numbers above are dense fp32 matmul through BLAS, which is already close to what a CPU
+can do, so a different code generator competes with a well-tuned GEMM rather than with
+something naive. Slang earns its place if the plane ever runs on a GPU, or if the policy is
+quantised to int8, where a hand-written kernel can beat a generic library. Both are
+measurements nobody has taken.
