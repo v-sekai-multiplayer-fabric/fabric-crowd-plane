@@ -426,9 +426,16 @@ unknown is a crowd denser than any measured, and the margin against it is that a
 fails should fall over, which is a legal outcome rather than an explosion.
 
 `bench/train_stance.py` trains a LINEAR policy with Augmented Random Search: one matrix from
-64 observations to 26 torques, 1664 parameters. Linear matters twice over. Inference for a
-whole crowd is a single matmul, and a matrix can be read, stored, and diffed, where a network
-cannot.
+64 observations to 26 torques, 1664 parameters.
+
+The reason to start linear is not that a matrix can be read while a network cannot. Both are
+just numbers, both store and diff the same way, and 1664 of them are no more interpretable
+than 100000. An earlier draft of this entry claimed otherwise and was wrong.
+
+The reason is that it is the smallest thing that might work. If it holds a stance, the task
+was easy and nothing larger is needed. If it fails, that is evidence about the task rather
+than about the training, and the next step is capacity. Starting with capacity teaches
+neither.
 
 First run, 300 iterations in 26 seconds: the return did not move, 130 at the start and 139 at
 the end. A return of 130 is about 43 steps, so the body was falling inside a second and the
