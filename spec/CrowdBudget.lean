@@ -808,6 +808,70 @@ theorem a_packed_body_is_192_bytes : bodyPackedBytes = 192 := by native_decide
     that gives zstd something to find. -/
 def nearBytesPerBodyFrame : Nat := 127
 
+/- ### Muscle space, which is a better nasty than rotations
+
+   A pose is not 36 joints times 3 axes. V-Sekai's `godot-humanoid-project` carries the
+   Mecanim humanoid representation, and it has been in the organisation for years:
+   `addons/humanoid/human_trait.gd`, Apache-2.0, Lyuma and lox9973. A pose there is 95 scalar
+   muscles. Each one is a single axis of a single joint, normalised to [-1, 1] across an
+   anatomical range that the file states outright in `MuscleDefaultMin` and
+   `MuscleDefaultMax`. Dropping the fingers, the eyes, and the jaw leaves 49 for a body in a
+   crowd.
+
+   Two things follow, and the second is the one that was being left on the floor. There are
+   fewer numbers: 49 against 108. And each number spans tens of degrees rather than a full
+   turn, so the same angular precision costs fewer bits. A shoulder twist covering 200
+   degrees needs 12 bits at 0.088 degrees. A jaw covering 20 degrees needs 9. The file
+   already knows which is which, so the bit depth is read off the range and never chosen.
+
+   This is what a nasty protocol is supposed to do. The range of motion is not data. It is a
+   property of a human, it is the same for everybody, and it belongs in the schema rather
+   than on the wire once every frame. -/
+
+def bodyMuscles : Nat := 49
+
+/-- MEASURED. `bench/wire_muscle.py`. Per-muscle bit depth from the anatomical range at
+    0.088 degrees, which is the precision 12 bits gives over a full turn. 9 bits for the
+    tightest muscle and 12 for the loosest, 511 bits for a body. -/
+def musclePackedBytes : Nat := 76
+
+/-- The rotation form, for comparison: 36 joints, 3 axes, 12 bits, plus a root. -/
+def rotationPackedBytes : Nat := 174
+
+theorem muscles_beat_rotations : rotationPackedBytes * 10 / musclePackedBytes = 22 := by
+  native_decide
+
+/- ### Entropy coding, and what run-length actually gives
+
+   Muscle deltas are small, bounded, and heavily peaked at zero, which is the shape an
+   entropy coder wants. Measured as an order-0 entropy over the delta symbols, which is the
+   floor a range coder reaches to within a percent or two:
+
+     packed, no coding                76 bytes
+     packed then zstd                 83   <- WORSE than not compressing
+     delta then zstd                  69
+     entropy floor, absolute          63
+     entropy floor, delta             53
+
+   Two of those rows are worth stating out loud. Compressing the packed stream makes it
+   bigger, because bit-packing at 9 to 12 bits smears every value across byte boundaries and
+   a byte-oriented compressor sees noise. And the delta has to come before the packing, for
+   the same reason.
+
+   Run-length encoding was worth checking and is not worth having. 13 percent of muscle
+   deltas are exactly zero, so the runs exist, but they are short and scattered. An entropy
+   coder already spends about 3 bits on a symbol that common, and a run token cannot beat
+   that without long runs to amortise it. Run-length is the right tool for a still crowd, and
+   this crowd is in headsets and moving. -/
+
+/-- The design number: delta, then an order-0 range coder over the muscle symbols. 53 bytes
+    plus a root position. zstd instead of a range coder gives 69 today and needs no new
+    code. -/
+def muscleEntropyBytes : Nat := 53
+
+theorem the_wire_is_sixty_eight_times_smaller :
+    joints * packetBytes * 100 / muscleEntropyBytes = 6792 := by native_decide
+
 /-- The same skeletal frame as cheap CBOR JSON-LD: named joints, float rotations,
     self-describing. 1168 bytes raw, 884 with zstd and the previous frame as a dictionary. -/
 def cheapBytesPerBodyFrame : Nat := 884
@@ -836,6 +900,19 @@ def clientBytesPerSecondPacked : Nat :=
   nearBodiesFull * nearBytesPerBodyFrame * publishHz + farBodiesRoot * farBytesPerBodyFrame * farHz
 
 theorem the_packed_client_takes_31_kb : clientBytesPerSecondPacked = 31000 := by native_decide
+
+/-- And in muscle space, with the far bodies down to a root position alone. -/
+def clientBytesPerSecondMuscle : Nat :=
+  nearBodiesFull * (muscleEntropyBytes + 12) * publishHz + farBodiesRoot * 12 * farHz
+
+theorem the_muscle_client_takes_17_kb : clientBytesPerSecondMuscle = 17200 := by native_decide
+
+theorem muscle_space_is_fifty_times_smaller_than_the_start :
+    clientBytesPerSecond / clientBytesPerSecondMuscle = 50 := by native_decide
+
+/-- A tenth of a megabit for each client, 137 megabits for the whole venue. -/
+theorem the_venue_pushes_137_megabits :
+    people * clientBytesPerSecondMuscle * 8 / 1000000 = 137 := by native_decide
 
 /-- 27 times less than sending positions for every joint. -/
 theorem packing_is_twenty_seven_times_smaller :
@@ -881,6 +958,24 @@ def egressTenthCentsPerHeadHourPacked : Nat :=
 
 def egressTenthCentsPerHeadMonthPacked : Nat :=
   occupancyHours * clientBytesPerSecondPacked * 3600 * egressTenthCentsPerGb / 1000000000
+
+/-- The bill in muscle space. -/
+def egressTenthCentsPerHeadMonthMuscle : Nat :=
+  occupancyHours * clientBytesPerSecondMuscle * 3600 * egressTenthCentsPerGb / 1000000000
+
+theorem muscle_egress_is_37_a_month :
+    egressTenthCentsPerHeadMonthMuscle = 37 := by native_decide
+
+/-- 26.5 cents for each head each month, against 213 before the wire was looked at. -/
+theorem a_muscle_head_costs_265 :
+    machineTenthCentsPerHeadPacked + egressTenthCentsPerHeadMonthMuscle = 265 := by
+  native_decide
+
+/-- Egress is now an eighth of the bill, so the wire is finished and the machine is not. -/
+theorem egress_is_now_an_eighth :
+    egressTenthCentsPerHeadMonthMuscle * 100
+      / (machineTenthCentsPerHeadPacked + egressTenthCentsPerHeadMonthMuscle) = 13 := by
+  native_decide
 
 theorem the_packed_machine_costs_228 : machineTenthCentsPerHeadPacked = 228 := by native_decide
 theorem packed_egress_is_66_a_month : egressTenthCentsPerHeadMonthPacked = 66 := by native_decide
