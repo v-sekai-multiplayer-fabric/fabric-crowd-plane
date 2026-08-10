@@ -1174,6 +1174,52 @@ theorem three_cores_pass_at_the_tail : peopleAt bodyP90Ns 3 = 1280 := by native_
 theorem three_cores_have_headroom :
     peopleAt bodyP90Ns 3 * 100 / people = 128 := by native_decide
 
+/- ## Measured on the platform, which moved the answer
+
+   Everything above was measured on one developer machine, a Ryzen desktop. weft does not run
+   there. MEASURED on Fly, `bench/fly/`, a performance-2x in sjc, one machine created, run
+   once, and destroyed:
+
+     batch 14    41.0 us median   52.6 p90
+     batch 28    39.4              44.1
+     batch 56    46.4              51.5
+
+   Against 27.3 median and 31.4 p90 on the desktop, the same body on the platform costs 1.7
+   times as much. The host reports itself only as "AMD EPYC", and a Firecracker guest on
+   shared hardware also has a wider tail: the spread between median and p90 is 28 percent
+   here against 15 at home.
+
+   Nothing about the design was wrong. The arithmetic was right and the constant was
+   measured on a machine nobody deploys to, which is the same class of error as quoting a
+   single body's cost for a plane full of them. A budget file cannot catch that either. What
+   it can do is make the correction one constant wide, which is what this is. -/
+
+/-- MEASURED on the platform, ninetieth percentile, `bench/fly/run_all.py`. -/
+def flyBodyP90Ns : Nat := 52560
+def flyBodyMedianNs : Nat := 46370
+
+theorem the_platform_is_seventy_percent_slower :
+    flyBodyP90Ns * 100 / bodyP90Ns = 167 := by native_decide
+
+/-- Three vCPU held a thousand at home and hold 830 on the platform. Four hold 1064. -/
+theorem three_cores_miss_on_the_platform : peopleAt flyBodyP90Ns 3 = 830 := by native_decide
+theorem four_cores_hold_on_the_platform : peopleAt flyBodyP90Ns 4 = 1064 := by native_decide
+theorem four_is_the_answer_there : peopleAt flyBodyP90Ns 4 > people := by native_decide
+
+/-- Which spends the spare vCPU the venue machine was carrying. It needed six and bought
+    eight, and it now needs seven. There is no smaller machine to move to. -/
+def flyCrowdCores : Nat := 4
+def flyVenueNeeded : Nat := flyCrowdCores + 1 + 2
+
+/-- Seven, and the platform sells eight. The spare vCPU the venue was carrying is spent. -/
+theorem the_venue_needs_seven : flyVenueNeeded = 7 := by native_decide
+theorem seven_still_fits_the_size_bought : flyVenueNeeded ≤ 8 := by native_decide
+
+/-- And one vCPU holds 301 people there rather than 487, which is the figure any small
+    deployment is sized from. -/
+theorem one_core_holds_301 : peopleAt flyBodyP90Ns 1 = 301 := by native_decide
+
+
 /-- The shipped wire: order-1 context coding, 21 bytes of muscle deltas plus a root position,
     at 20 Hz for the bodies within touching distance. Distant bodies send a root position at
     5 Hz and the client interpolates. -/

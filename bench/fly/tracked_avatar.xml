@@ -1,0 +1,109 @@
+<!-- A body sized to what an HMD and body tracking can observe.
+
+     Six-point tracking gives head, two hands, waist, and two feet: six rigid transforms.
+     Eleven-point adds elbows and knees. Nothing observes a muscle, a tendon, or a
+     wrapping site, so this model has none of them. It has the joints an inverse
+     kinematics solve can determine and the capsules a crowd needs to push against.
+
+     Limbs are capsules because MuJoCo has no tapered capsule primitive. The taper is
+     carried on the wire and in the contact layer, not here. -->
+<mujoco model="tracked_avatar">
+  <compiler angle="radian"/>
+  <option timestep="0.008" solver="Newton" iterations="10"/>
+
+  <default>
+    <geom type="capsule" condim="3" friction="0.9 0.005 0.0001" density="985"/>
+    <joint type="hinge" damping="2" armature="0.02"/>
+    <motor ctrlrange="-150 150"/>
+  </default>
+
+  <worldbody>
+    <geom name="floor" type="plane" size="50 50 0.1" density="0"/>
+
+    <body name="pelvis" pos="0 0 0.95">
+      <freejoint/>
+      <geom name="pelvis" fromto="0 -0.09 0 0 0.09 0" size="0.11"/>
+
+      <body name="torso" pos="0 0 0.13">
+        <joint name="spine_x" axis="1 0 0" range="-0.6 0.6"/>
+        <joint name="spine_y" axis="0 1 0" range="-0.6 0.6"/>
+        <joint name="spine_z" axis="0 0 1" range="-0.8 0.8"/>
+        <geom name="torso" fromto="0 0 0 0 0 0.30" size="0.13"/>
+
+        <body name="head" pos="0 0 0.40">
+          <joint name="neck_x" axis="1 0 0" range="-0.7 0.7"/>
+          <joint name="neck_y" axis="0 1 0" range="-0.7 0.7"/>
+          <joint name="neck_z" axis="0 0 1" range="-1.2 1.2"/>
+          <geom name="head" type="sphere" size="0.10"/>
+        </body>
+
+        <body name="upper_arm_l" pos="0 0.19 0.28">
+          <joint name="sho_l_x" axis="1 0 0" range="-2.0 2.0"/>
+          <joint name="sho_l_y" axis="0 1 0" range="-2.0 2.0"/>
+          <joint name="sho_l_z" axis="0 0 1" range="-2.0 2.0"/>
+          <geom name="uarm_l" fromto="0 0 0 0 0.02 -0.28" size="0.045"/>
+          <body name="lower_arm_l" pos="0 0.02 -0.28">
+            <joint name="elb_l" axis="0 1 0" range="-2.6 0"/>
+            <geom name="larm_l" fromto="0 0 0 0 0 -0.26" size="0.038"/>
+          </body>
+        </body>
+
+        <body name="upper_arm_r" pos="0 -0.19 0.28">
+          <joint name="sho_r_x" axis="1 0 0" range="-2.0 2.0"/>
+          <joint name="sho_r_y" axis="0 1 0" range="-2.0 2.0"/>
+          <joint name="sho_r_z" axis="0 0 1" range="-2.0 2.0"/>
+          <geom name="uarm_r" fromto="0 0 0 0 -0.02 -0.28" size="0.045"/>
+          <body name="lower_arm_r" pos="0 -0.02 -0.28">
+            <joint name="elb_r" axis="0 1 0" range="-2.6 0"/>
+            <geom name="larm_r" fromto="0 0 0 0 0 -0.26" size="0.038"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="thigh_l" pos="0 0.09 -0.06">
+        <joint name="hip_l_x" axis="1 0 0" range="-0.7 0.7"/>
+        <joint name="hip_l_y" axis="0 1 0" range="-1.9 0.6"/>
+        <joint name="hip_l_z" axis="0 0 1" range="-0.7 0.7"/>
+        <geom name="thigh_l" fromto="0 0 0 0 0 -0.40" size="0.065"/>
+        <body name="shin_l" pos="0 0 -0.40">
+          <joint name="knee_l" axis="0 1 0" range="0 2.4"/>
+          <geom name="shin_l" fromto="0 0 0 0 0 -0.39" size="0.05"/>
+          <body name="foot_l" pos="0 0 -0.41">
+            <joint name="ank_l_x" axis="1 0 0" range="-0.5 0.5"/>
+            <joint name="ank_l_y" axis="0 1 0" range="-0.8 0.8"/>
+            <geom name="foot_l" fromto="-0.05 0 0 0.14 0 0" size="0.035"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="thigh_r" pos="0 -0.09 -0.06">
+        <joint name="hip_r_x" axis="1 0 0" range="-0.7 0.7"/>
+        <joint name="hip_r_y" axis="0 1 0" range="-1.9 0.6"/>
+        <joint name="hip_r_z" axis="0 0 1" range="-0.7 0.7"/>
+        <geom name="thigh_r" fromto="0 0 0 0 0 -0.40" size="0.065"/>
+        <body name="shin_r" pos="0 0 -0.40">
+          <joint name="knee_r" axis="0 1 0" range="0 2.4"/>
+          <geom name="shin_r" fromto="0 0 0 0 0 -0.39" size="0.05"/>
+          <body name="foot_r" pos="0 0 -0.41">
+            <joint name="ank_r_x" axis="1 0 0" range="-0.5 0.5"/>
+            <joint name="ank_r_y" axis="0 1 0" range="-0.8 0.8"/>
+            <geom name="foot_r" fromto="-0.05 0 0 0.14 0 0" size="0.035"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <motor joint="spine_x"/> <motor joint="spine_y"/> <motor joint="spine_z"/>
+    <motor joint="neck_x"/>  <motor joint="neck_y"/>  <motor joint="neck_z"/>
+    <motor joint="sho_l_x"/> <motor joint="sho_l_y"/> <motor joint="sho_l_z"/>
+    <motor joint="elb_l"/>
+    <motor joint="sho_r_x"/> <motor joint="sho_r_y"/> <motor joint="sho_r_z"/>
+    <motor joint="elb_r"/>
+    <motor joint="hip_l_x"/> <motor joint="hip_l_y"/> <motor joint="hip_l_z"/>
+    <motor joint="knee_l"/>  <motor joint="ank_l_x"/> <motor joint="ank_l_y"/>
+    <motor joint="hip_r_x"/> <motor joint="hip_r_y"/> <motor joint="hip_r_z"/>
+    <motor joint="knee_r"/>  <motor joint="ank_r_x"/> <motor joint="ank_r_y"/>
+  </actuator>
+</mujoco>

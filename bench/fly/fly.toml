@@ -1,0 +1,9 @@
+# Benchmark only. No services, no ports, nothing that stays up.
+# A machine is created, it runs once, it is destroyed. See README.md.
+app = "weft-crowd-bench"
+primary_region = "sjc"
+
+[build]
+
+[[vm]]
+  size = "performance-2x"
