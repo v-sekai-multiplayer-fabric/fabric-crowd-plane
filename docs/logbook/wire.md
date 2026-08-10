@@ -421,3 +421,61 @@ honest number, and every order-1 figure in this book taken the same way is optim
 
 Muscles at order-2 and the root in page bounds is **22.1 bytes for a body for a frame**, which
 is 2.9 kB a second for a client and 67 always-on players at 15 dollars.
+
+## Is there a mathematical wall? Not the one I reached for
+
+Asked whether the wire has a calculable floor. Two candidates, and neither is the clean wall
+the question deserves.
+
+### Rate-distortion is not a floor, it is a ceiling
+
+Shannon's water-filling on the measured power spectrum, at a distortion of 0.088 degrees,
+gives **28.0 bytes for a body for a frame** at 20 Hz. An order-2 coder already achieves 24.9.
+
+A bound below a measurement means the bound is wrong, and this one is: **rate-distortion for a
+Gaussian source is the worst case at a given spectrum**, because a Gaussian is the hardest
+thing to compress with that much variance. So water-filling gives an *achievable target*, an
+upper bound on the minimum rate, and beating it only says human motion is smoother than noise.
+Which it is: a limb swings along an arc, and an arc is predictable in a way white noise is not.
+
+An earlier line in this entry called it "the wall that no codec of any kind beats". That was
+wrong in the direction that flatters the design, which is the direction to be most careful in.
+
+### The entropy rate would be a floor, and this data cannot estimate it
+
+Conditional entropy by context order:
+
+| order | B/body/frame | gain |
+| --- | --- | --- |
+| 0 | 31.5 | |
+| 1 | 28.5 | 3.0 |
+| 2 | 24.9 | 3.6 |
+| 3 | 20.7 | 4.2 |
+
+A converging entropy rate produces **diminishing** gains. These accelerate, which is the
+signature of a model fitting noise rather than finding structure.
+
+| order | contexts | samples for each |
+| --- | --- | --- |
+| 0 | 1 | 9600 |
+| 1 | 15 | 640 |
+| 2 | 225 | 43 |
+| 3 | 3375 | **3** |
+
+At order-3 each context sees three samples, so the estimate is memorising the data. The 20.7
+is not a rate, it is an artefact, and the order-2 figure of 24.9 is already thin at 43 samples
+for each context.
+
+### What can honestly be said
+
+There is no cheap mathematical wall here. What there is:
+
+- The Gaussian rate-distortion figure, **28.0 bytes**, is a target that a good coder should
+  beat, and ours does.
+- The true entropy rate is somewhere below 24.9 and this dataset cannot say where, because
+  measuring it needs orders of magnitude more motion than 1200 frames of eight bodies.
+- Getting a real answer means more data, not more cleverness. The AddBiomechanics corpus now
+  on disk is the obvious source, and it is real human motion rather than a driven ragdoll.
+
+The practical position is unchanged: about 22 bytes at 60 Hz, about 25 at 20 Hz, and the next
+honest gain comes from measuring on real motion rather than from another transform.
