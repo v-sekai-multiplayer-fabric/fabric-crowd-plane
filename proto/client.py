@@ -95,15 +95,28 @@ async def main():
     import websockets
     server = viser.ViserServer()
     server.scene.add_grid("/floor", width=40.0, height=40.0)
-    drive = {"v": (0.0, 0.0)}
-    with server.gui.add_folder("Shove your body"):
+    # The command is what the steering task takes: a move direction, and a facing that is
+    # independent of it. Jump and crouch are separate again.
+    cmd = {"move": (0.0, 0.0), "face": (0.0, 0.0), "jump": False, "crouch": False}
+    with server.gui.add_folder("Move"):
         for label, dx, dy in (("forward", 1, 0), ("back", -1, 0),
-                              ("left", 0, 1), ("right", 0, -1), ("stop", 0, 0)):
+                              ("strafe left", 0, 1), ("strafe right", 0, -1),
+                              ("stop", 0, 0)):
             server.gui.add_button(label).on_click(
-                lambda _, dx=dx, dy=dy: drive.update(v=(dx, dy)))
+                lambda _, dx=dx, dy=dy: cmd.update(move=(dx, dy)))
+    with server.gui.add_folder("Face"):
+        for label, fx, fy in (("north", 1, 0), ("south", -1, 0),
+                              ("west", 0, 1), ("east", 0, -1)):
+            server.gui.add_button(label).on_click(
+                lambda _, fx=fx, fy=fy: cmd.update(face=(fx, fy)))
+    with server.gui.add_folder("Act"):
+        jb = server.gui.add_button("jump")
+        jb.on_click(lambda _: cmd.update(jump=True))
+        cb = server.gui.add_checkbox("crouch", False)
+        cb.on_update(lambda _: cmd.update(crouch=cb.value))
     status = server.gui.add_text("plane", initial_value="connecting")
 
-    async with websockets.connect(PLANE, max_size=None) as ws:
+    async with websockets.connect(PLANE, max_size=None, open_timeout=30) as ws:
         meta = json.loads(await ws.recv())
         skel = Skeleton(meta)
         nmus = meta["muscles"]
@@ -131,8 +144,11 @@ async def main():
         async def send_input():
             last = None
             while True:
-                if drive["v"] != last:
-                    last = drive["v"]; await ws.send(json.dumps(list(last)))
+                snap = dict(cmd)
+                if snap != last:
+                    last = snap
+                    await ws.send(json.dumps(snap))
+                    cmd["jump"] = False          # a jump is an edge, not a state
                 await asyncio.sleep(1 / 30)
         asyncio.create_task(send_input())
 

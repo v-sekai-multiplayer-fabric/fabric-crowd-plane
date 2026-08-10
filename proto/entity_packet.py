@@ -54,3 +54,35 @@ class Packet:
 
 
 assert _HEAD.size == PAYLOAD_OFFSET, f"header is {_HEAD.size}, expected {PAYLOAD_OFFSET}"
+
+
+# ---------------------------------------------------------------------------
+# Vectorised encoding.
+#
+# Building packets one at a time in Python costs more than the physics they
+# describe: 40 bodies at 26 muscles is 1040 `encode` calls a frame, and that
+# measured 7956 microseconds against 1169 for the simulation step itself.
+#
+# The layout is fixed, so a numpy structured dtype expresses it exactly and the
+# whole frame is filled column by column. `PACKET_DTYPE` is byte-for-byte the
+# same as `encode`, which `test_packet_golden.py` checks.
+# ---------------------------------------------------------------------------
+import numpy as _np
+
+PACKET_DTYPE = _np.dtype([
+    ("gid", "<u4"),          # 0
+    ("pos", "<i8", 3),       # 4
+    ("vel", "<i2", 3),       # 28
+    ("_pad", "V6"),          # 34, unused by the spec
+    ("hlc", "<u4"),          # 40
+    ("class_owner", "<u4"),  # 44
+    ("sub_index", "<u4"),    # 48
+    ("rot", "<i2", 3),       # 52
+    ("payload", "V42"),      # 58
+])
+assert PACKET_DTYPE.itemsize == SIZE, f"dtype is {PACKET_DTYPE.itemsize}, expected {SIZE}"
+
+
+def empty(count):
+    """A zeroed block of packets, ready to fill column by column."""
+    return _np.zeros(count, dtype=PACKET_DTYPE)

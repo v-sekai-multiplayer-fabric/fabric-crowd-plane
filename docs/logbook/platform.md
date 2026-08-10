@@ -361,3 +361,35 @@ At 17 bytes and the 139 people a core measured earlier, 15 dollars buys about 20
 players rather than 72. That is an extrapolation from two measurements taken separately, and it
 should be believed only as far as the smaller of them: the capacity figure came from a driven
 avatar with no controller, and a real crowd will differ.
+
+## A plane that falls behind stops accepting players
+
+The deployed room served one client and then refused every reconnection with a handshake
+timeout, and the browser reconnected in a loop showing an empty scene. Fly returned 502 while
+the machine was plainly running and simulating.
+
+The cause was four lines in the tick loop:
+
+    rest = t0 + i * TICK - time.perf_counter()
+    if rest > 0:
+        await asyncio.sleep(rest)
+
+`if rest > 0` looks like a harmless guard against sleeping a negative duration. It is a
+starvation bug. The moment the simulation overruns its tick, `rest` goes negative, the `await`
+never executes, and the loop spins without yielding. Nothing else on the event loop runs, so a
+new client's handshake is never served and times out. The plane keeps simulating perfectly and
+becomes unreachable.
+
+    await asyncio.sleep(rest if rest > 0 else 0)
+
+That is the fix, plus a clamp that stops trying to catch up once more than ten ticks behind.
+Zero restarts afterwards, 136 person-to-person contacts, a stable client.
+
+The property worth stating: **a plane under load must still be able to accept a player.** A
+system that stops admitting exactly when it is busiest looks identical to one that has
+crashed, and the admission control this design relies on cannot run if admission is the first
+thing starvation kills.
+
+It also explains why the first diagnosis was wrong. The frame builder was measured at 0.1
+milliseconds and cleared, and it was never the problem: the loop was not slow, it simply never
+gave anything else a turn.

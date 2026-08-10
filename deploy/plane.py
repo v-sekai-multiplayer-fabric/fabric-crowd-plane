@@ -35,26 +35,6 @@ CROUCH = float(os.environ.get("CROUCH", "2500"))
 FACE_TORQUE = float(os.environ.get("FACE_TORQUE", "400"))
 PORT = int(os.environ.get("PORT", "8770"))
 CLASS_SKELETON_JOINT = 2       # the class field says how to read the packet
-# How many fixed steps one pass may take before the plane gives up and drops the debt.
-#
-# Godot uses `max_physics_steps_per_frame`, default 8, which is a number chosen to feel right.
-# There is a derived one here instead. `lean-spatial-oracle/core/Resources.lean`:
-#
-#     latencyTicksFloor = max (simTickHz / 10) 1        -- 100 ms at any tick rate
-#     perNeighborLatencyTicks rtt = max (ceil(rtt*hz/1000) + drainMargin) latencyTicksFloor
-#
-# That is the lateness the fabric already tolerates: the staging timeout a migration is
-# allowed before it is considered failed, with a one-tick drain margin proved sufficient.
-# A plane may therefore be late by up to that and still be inside what the protocol assumes.
-# Past it, the predictions the rest of the system makes are no longer sound, so dropping is
-# not a fallback but the correct thing.
-#
-# At 60 Hz this is 6 steps, and it moves with the tick rate rather than being pinned to 8.
-SIM_TICK_HZ = int(1.0 / TICK)
-DRAIN_MARGIN = 1                                   # proved: a queue drains in one tick
-LATENCY_TICKS_FLOOR = max(SIM_TICK_HZ // 10, 1)
-RTT_MS = int(os.environ.get("RTT_MS", "0"))
-MAX_STEPS = max((RTT_MS * SIM_TICK_HZ + 999) // 1000 + DRAIN_MARGIN, LATENCY_TICKS_FLOOR)
 V_MAX_RAD_S = 30.0             # scale for the velocity field, radians a second
 
 
@@ -243,89 +223,40 @@ async def main():
     comp = zstd.ZstdCompressor(level=1)
 
     async def loop():
-        """A fixed-timestep accumulator, the shape Godot's MainTimerSync uses.
-
-        The naive version sleeps until the next tick and does nothing when it is late:
-
-            rest = t0 + i * TICK - now
-            if rest > 0: await sleep(rest)
-
-        That has two faults and this session hit both. It never yields when behind, so the
-        event loop starves and a new connection never finishes its handshake. And it
-        accumulates a debt it cannot pay, so one slow frame makes every later frame late,
-        which is the spiral of death.
-
-        Godot's answer, and this one: keep an accumulator of real time, spend it in whole
-        fixed steps, and cap how many steps one pass may take. Past the cap, throw the
-        remaining time away rather than chase it. Physics then runs slower than real time
-        under load, which is honest, instead of running late forever and pretending.
-
-        The cap is not Godot's 8. It is `latencyTicks` from the predictive BVH resources
-        spec: the lateness a migration is already allowed to have before it is called failed.
-        Inside that, being late is something the rest of the system is built to absorb.
-        Outside it, the ghost bounds and waypoint periods stop being sound, so continuing to
-        chase the debt would be simulating a world nothing else agrees with.
-        """
-        i = 0
-        sent = 0
-        accum = 0.0
+        i, t0, sent = 0, time.perf_counter(), 0
         prev = None
-        last = time.perf_counter()
-        t_report = last
-
-        comp = zstd.ZstdCompressor(level=1)
-
         while True:
-            now = time.perf_counter()
-            frame_time = now - last
-            last = now
-            # A pathological stall must not become thousands of steps.
-            accum += min(frame_time, TICK * MAX_STEPS)
-
-            steps = 0
-            while accum >= TICK and steps < MAX_STEPS:
-                room.step(drives)
-                accum -= TICK
-                steps += 1
-                i += 1
-
-                if i % PUBLISH_EVERY == 0 and clients:
-                    raw = room.frame(i // PUBLISH_EVERY)
-                    if prev is not None and len(prev) == len(raw):
-                        d = bytes(a ^ b for a, b in zip(raw, prev))
-                        buf = b"\x01" + comp.compress(d)
-                    else:
-                        buf = b"\x00" + comp.compress(raw)
-                    prev = raw
-                    sent += len(buf) * len(clients)
-                    await asyncio.gather(*[c.send(buf) for c in list(clients.values())],
-                                         return_exceptions=True)
-
-            if steps == MAX_STEPS and accum >= TICK:
-                # Saturated. Drop the debt and say so: a plane that cannot keep up should
-                # run slow visibly, not silently fall further behind.
-                dropped = accum
-                accum = 0.0
-                print(f"[plane] saturated, dropped {dropped*1000:.0f} ms of simulation",
-                      flush=True)
-
-            if now - t_report >= 10.0:
-                el = now - t_report
+            room.step(drives)
+            i += 1
+            if i % PUBLISH_EVERY == 0 and clients:
+                raw = room.frame(i // PUBLISH_EVERY)
+                if prev is not None and len(prev) == len(raw):
+                    d = bytes(a ^ b for a, b in zip(raw, prev))     # delta against last frame
+                    buf = b"\x01" + comp.compress(d)
+                else:
+                    buf = b"\x00" + comp.compress(raw)
+                prev = raw
+                sent += len(buf) * len(clients)
+                await asyncio.gather(*[c.send(buf) for c in list(clients.values())],
+                                     return_exceptions=True)
+            if i % 600 == 0:
+                el = time.perf_counter() - t0
                 each = sent / max(1, len(clients)) / el / 1000
-                print(f"[plane] {i//60}s sim  {len(clients)} clients  "
+                print(f"[plane] {i//60}s  {len(clients)} clients  "
                       f"{room.cross_contacts()} person-to-person contacts  "
                       f"{each:.2f} kB/s each", flush=True)
-                sent = 0
-                t_report = now
-
-            # Always yield, whether or not there was time to spare. This is the line whose
-            # absence starved the event loop.
-            await asyncio.sleep(max(0.0, TICK - accum) if steps else 0)
+            # Always yield, even when the tick has already overrun. `if rest > 0: await`
+            # looks harmless and starves the event loop the moment the simulation falls
+            # behind: nothing else runs, so a new client's handshake never gets served and
+            # times out. A plane under load must still be able to accept a player.
+            rest = t0 + i * TICK - time.perf_counter()
+            await asyncio.sleep(rest if rest > 0 else 0)
+            if rest < -TICK * 10:
+                # More than ten ticks behind. Give up catching up rather than spiral.
+                t0 = time.perf_counter() - i * TICK
 
     async with websockets.serve(handler, "0.0.0.0", PORT, max_size=None):
-        print(f"[plane] {N} bodies simulating, publishing on :{PORT}. "
-              f"{SIM_TICK_HZ} Hz, at most {MAX_STEPS} steps a pass "
-              f"(latencyTicks, {MAX_STEPS*TICK*1000:.0f} ms)", flush=True)
+        print(f"[plane] {N} bodies simulating, publishing on :{PORT}", flush=True)
         await loop()
 
 
