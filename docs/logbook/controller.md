@@ -509,3 +509,35 @@ protomotions hands to the first step, so what remains is what protomotions does 
 between loading it and stepping it. It strips a `<sensor>` element, adds five projectile bodies
 as free joints, and sets the timestep. The projectiles are the interesting one, because they are
 bodies that the file did not have and the reference knows nothing about.
+
+## The projectiles are not the fault either, and that narrows it to two things
+
+protomotions injects five projectile bodies into the MJCF as free joints. They were the best
+remaining suspect: they explain the `(66,) versus (101,)` shape mismatch exactly, because
+101 minus 66 is 35 and that is five free joints of seven `qpos` each.
+
+Running with `num_projectiles=0`:
+
+    model: nq=73 nv=72 nu=66 nbody=24
+    step 0  root_z=1.047  |qacc|=2.732e+06  ncon=2  warn=none
+    step 1  root_z=0.002  mjWARN_BADQACC
+
+`nq=73` is the bare file's own size, so the projectiles are genuinely gone. **And the
+acceleration is unchanged at 2.7 million.**
+
+That is worth more than a fix, because the remaining space is now very small. The bare file at
+the same pose gives 5900. protomotions gives 2732000 with identical `nq`, `nv` and `nu`. So the
+difference is **not structural**, and only two things separate the two runs:
+
+1. **The velocities.** The probe set `qvel` to zero. protomotions writes the reference's own
+   `dvs` and `gvs` into `qvel` at reset.
+2. **The ground.** protomotions builds a terrain heightfield. The probe had no floor at all,
+   so the body fell through and never touched anything.
+
+Seven suspects are now eliminated with evidence: the checkpoint, the reference motion, the
+reset placement, the passive joint springs, the actuator force limits, the control mode, and
+the projectile bodies. Each was ruled out by a measurement rather than by reading.
+
+The next test separates the last two by setting `qvel` to zero at reset and reading `qacc`. If
+it drops to the bare figure the reference velocities are the cause, and if it does not the
+ground is.
