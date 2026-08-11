@@ -105,6 +105,12 @@ ALLOWED = {
                   "10.5281/zenodo.14013468. Falls and balance perturbation, which is the "
                   "push gap and the thing that precedes getting up. Xsens MVN and labelled "
                   "MATLAB, so it needs a reader before it is motion.",
+    "pyroki": "PyRoki, MIT. A TOOL, not a corpus: differentiable forward kinematics from a "
+              "URDF with a Levenberg-Marquardt solver, joint limits as hard constraints, and "
+              "self-collision costs. That is the retarget this repo has been describing as "
+              "work with no tool named. SMPL appears only as a joint NAME list inside the "
+              "example helpers and never in the library, so it is a naming scheme and not "
+              "the body model, by the same rule that admits a mixamo-compatible rig.",
     "quaternius": "Quaternius Universal Animation Library, CC0 1.0. Public domain, so there "
                   "is nothing to inherit and nothing to attribute. 120+ animations at 30 fps "
                   "on a retargetable humanoid rig, with root motion on all locomotion. Its "

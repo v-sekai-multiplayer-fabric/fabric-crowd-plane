@@ -206,3 +206,33 @@ The documentation says contacts are "trained to support this, but not currently 
 in the demo UI or Python API". That is true of the UI and the public API and not of the model,
 which is a useful distinction to have found before writing a training loop to add a feature
 that is already there.
+
+## The retarget had a tool the whole time
+
+This logbook has repeatedly called retargeting "deterministic and it is work", without naming
+anything to do it with. `chungmin99/pyroki` is that tool: MIT, JAX, differentiable forward
+kinematics from a URDF, a Levenberg-Marquardt solver on manifolds, joint limits as hard
+constraints, and self-collision costs. It ships `10_humanoid_retargeting.py` and a fancier
+variant, so humanoid retargeting is an example rather than something to invent.
+
+Three of its properties matter here specifically.
+
+**Joint limits are constraints, not suggestions.** The ranges measured out of MS-Human-700 in
+`anatomy.md` become hard constraints in the solve, so a retarget cannot produce the poses the
+old body could reach and a person cannot.
+
+**Self-collision is a cost.** Retargeting a tall body's motion onto a short one naively puts
+limbs through the torso. This is the thing that makes the Anny cross product real rather than
+theoretical: one clip onto five sampled bodies is five IK solves, each respecting that body's
+own limb lengths and its own limits.
+
+**protomotions already reads its output.** `convert_pyroki_retargeted_robot_motions_to_proto.py`
+imports `robot_config` and `extract_qpos_from_transforms`, so the path from a pyroki solve to
+soma23 qpos exists and does not need writing.
+
+SMPL appears in the repository only as a joint name list in `examples/retarget_helpers/_utils.py`
+and never inside `src/pyroki`. A list of joint names is a naming scheme, which is the same
+distinction that admits a mixamo-compatible rig while refusing mixamo data.
+
+The one real cost is that the parser reads URDF and our body is MJCF, so the avatar needs
+converting before it can be a retarget target.
