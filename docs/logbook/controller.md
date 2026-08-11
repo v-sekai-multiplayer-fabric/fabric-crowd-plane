@@ -428,3 +428,54 @@ And a body under physics is not placed twice. A `qpos` write in the middle of an
 throws away momentum and contact state, so it reads as a jump however careful the write is.
 Either it is a reset, which is the sequence above, or it is control, and control moves a body
 with actuators toward a target instead of assigning it.
+
+## mjWARN_BADQACC. The physics diverges before the policy acts
+
+Tracing every state write with its caller settled it. There is one write per episode, from
+`simple_test_policy` through `env.reset` and `reset_envs`, and it is correct:
+
+    SET_STATE #0 -> root=[40.6 62.4 1.04]
+    STEP 0  root=[40.6 62.4 1.04] |qvel|=0.007 ncon=2
+    STEP 1  root=[0.   0.   0.002] |qvel|=9.653 ncon=27
+
+**Nothing writes state between those two steps.** A body cannot cross 74 m in 0.02 s, so
+nothing moved it. MuJoCo did. Reading the warning counters gives the mechanism:
+
+    STEP 0  |qacc|=2.72e+06  |tgt|=1.006  warnings=none
+    STEP 1  |qacc|=9.65e+03  |tgt|=3.142  mjWARN_BADQACC: 1
+
+At step 0 the acceleration is already **2.72 million**, while the action is **1.006**, which is
+a sane action and is nowhere near pi. The body is placed correctly, at 1.034 m with two
+contacts. So the divergence happens before the policy has any part in it.
+
+MuJoCo detects the bad acceleration, raises `mjWARN_BADQACC`, and restores `qpos0`. `qpos0` is
+the model default, which puts the root at the origin with the feet through the floor and 27
+contacts. It diverges again, and it is restored again, every step. That is the bit-identical
+`qvel` of 9.653 that no single simulator should have produced, and it is why the state looked
+frozen while the observation kept moving.
+
+Everything else follows from it. The body reads as being at the origin while the reference
+plays at the terrain spawn, so `mimic_target_poses` carries the distance between them, which
+was 164 for a spawn at [168.9, 145.2]. That is the factor of a hundred, and it was never a
+unit fault. The policy then sees an input far outside its training range and rails at pi,
+which is correct behaviour for a network.
+
+### The order, corrected once more
+
+1. The physics diverges on the first step, with a sane action.
+2. MuJoCo restores `qpos0`, which is the origin, and the body is buried there.
+3. The observation carries the distance from the origin to the spawn.
+4. The policy rails, because that input is far outside anything it was trained on.
+5. The body stays on the floor, and the episode reports failure.
+
+Every measurement taken before this one was a measurement of step 2 or later.
+
+### What it is not
+
+It is not the checkpoint, which scores 0.9996 and has no zero tensor. It is not the reference,
+which is 61 finite motions at 30 fps. It is not the reset, which places the body correctly. It
+is not the action range, which is upstream NVIDIA and matches training. It is not a second
+simulator, which does not exist. Each of those was suspected here in turn and each is cleared.
+
+It is the MuJoCo model setup. The tracker was trained in IsaacLab, and this is the MuJoCo port
+of that model diverging on its first step.
