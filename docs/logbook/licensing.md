@@ -373,3 +373,50 @@ personal data about that person, so the GEM-X path over CC-BY video inherits a q
 video licence cannot answer, because the uploader granted it and the person in frame did not.
 `video_admissible` already refused to return a bare yes there. It was right for a weaker
 reason than the real one.
+
+## Hugging Face and Zenodo, swept
+
+Neither had been searched for datasets. Hugging Face had only been searched for models.
+
+**Hugging Face is thin.** Eighteen queries across bvh, gait, sit to stand, xsens, vicon,
+retargeting and the rest, filtered to permissive licences and at least twenty downloads,
+returned eleven distinct datasets. Almost all are EMG traces or gait signals rather than
+full body motion. One trap worth naming: `microsoft/mocapact-data` carries
+`cdla-permissive-2.0`, and its files are named `CMU_083_33.hdf5`. It is CMU by way of AMASS,
+so the permissive badge sits on top of two blocked corpora, exactly as MIT sat on top of
+LAFAN1 in the motion matching repositories.
+
+**Zenodo is where the two finds were**, and both are CC BY 4.0:
+
+- **100STYLE**, 16.2 GB, four million frames, 100 locomotion styles including sidestep walk
+  and run and idling, which are two measured gaps. Verified on two signals, the Zenodo record
+  and the author's own page, which asks for credit as "The 100STYLE Dataset - Ian Mason".
+- **Virtual Reality Balance Disturbance**, 32.4 GB, falls and balance perturbation from Xsens
+  and labelled MATLAB. That is the push gap and the thing that precedes getting up.
+
+Everything else Zenodo holds under an open licence is a **biomechanics gait laboratory**, and
+that is the same category as AddBiomechanics: excellent force data, treadmill bound, gait
+only. The Kuopio set is 23 GB of markers, ground reaction forces, and IMU from 51
+participants. An elaborate gait set with mechanical perturbations is CC-ZERO and is a
+treadmill belt accelerating under a walker. Neither holds sitting, getting up, or a shove.
+
+My Zenodo queries also leaked badly enough to be worth recording. Searching for motion terms
+returned ImageNet-C, a Chinese land cover map, and a hundred thousand histological images of
+colorectal cancer, all correctly labelled CC BY 4.0. A licence filter plus a keyword is not a
+subject filter, which is the same lesson the Fab props taught, arriving from a different
+direction.
+
+### The shape of the whole search
+
+Five sweeps in, the categories are stable and there is little left to turn over:
+
+| category | outcome |
+| --- | --- |
+| research mocap corpora | AMASS, SMPL, CMU, LAFAN1, Bandai, Motorica: non-commercial |
+| motion matching repositories | MIT code over LAFAN1 data |
+| generative models | AMASS-derived, except Kimodo |
+| biomechanics laboratories | open, and treadmill gait only |
+| marketplaces | per item, mostly props |
+| **CC0 game art** | **Quaternius, the cleanest thing found** |
+| **CC BY exceptions** | **100STYLE and VR Balance, both on Zenodo** |
+| generation | 32 minutes of gap for 8 minutes of compute |
