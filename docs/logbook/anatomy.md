@@ -147,3 +147,42 @@ guess.
 The right fix is to solve the 68 parameters for a stated height, with the population coming
 from Anny's conditional distributions, which is the same machinery `motors.py` already uses to
 scale actuators from height and mass. Not done yet.
+
+## The Anny parameters were already worked out, in Lean, in this org
+
+`v-sekai-multiplayer-fabric/lean-humanoid-rom` holds them, and this session re-derived several
+by hand before finding it. What is in there:
+
+- `anny_rom_real.json`, measured bone lengths and joint ranges per sampled body
+- `anny_rom_sweep.py` and `anny_to_humanoid_rom.py`, the sweep already written
+- `AddBiomechanicsROM.lean`, `B3DParser.lean`, `extract_addbiomechanics_rom.py`
+- `addbiomechanics_env/pixi.toml`, the nimblephysics environment **rebuilt from scratch today**
+- `core/HumanoidConstraints.lean`, `core/KusudamaSolver.lean`, `core/EWBIKDecomposition.lean`
+
+The API is the part that cost the most time. Phenotypes are a **dict of named tensors**, not a
+flat vector:
+
+    model = anny.create_fullbody_model()
+    model.get_mesh(phenotype_kwargs={"height": torch.tensor([[0.65]]), ...})
+
+Going through py-soma-x's `SomaLayer` instead, which takes a flat `identity_coeffs`, produced a
+sequence of shape errors ending in `[B, 11] got (1, 6)`. The 6 is real: the model is built with
+six active phenotypes because `EXCLUDED_PHENOTYPES` drops cupsize, firmness, and the three
+appearance categories, while the parser still demands all eleven. Passing eleven zeros then
+rendered a **0.44 m** body, and sweeping the height entry moved it only to 0.90 m, which is
+where guessing should have stopped.
+
+The units are not uniform either. In `anny_rom_real.json`, **age is in years**, 18.03, while
+gender, weight, and height sit near [-1, 1]. A single normalisation assumption across the
+eleven is wrong.
+
+### What this cost
+
+Re-derived by hand this session, all of it already present in that repository: the pixi
+environment for nimblephysics, the AddBiomechanics reader, segment lengths from the Anny rest
+pose, and joint ranges. The measurements agreed, which is some comfort, but agreement was not
+worth the time.
+
+The rule that would have caught it is not about Anny. **Search the organisation before
+deriving anything anatomical.** Fourteen `lean-*` hexagons exist there, and `lean-humanoid-rom`
+is named exactly for what was being rebuilt.
