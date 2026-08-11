@@ -293,3 +293,57 @@ constraint endpoints, and both times the fix was to look at what produced the di
 That moves the suspect from the policy to what the policy is fed. A tracker that scores 0.9996
 on correct observations and collapses on ours is an observation plumbing fault, and plumbing is
 assembly rather than research.
+
+## The control was never zero. It was railed at pi
+
+Tracing a live eval, with the reset and the control path wrapped rather than the source
+edited, overturned most of the previous entry.
+
+    RESET called: root_pos=[168.9 145.2 1.036]   dof_pos max=2.485
+    after reset:  qpos[0:3]=[168.9 145.2 1.036]  ncon=2
+    ctrl step   0: |targets| max=2.33449  root_z=1.036
+    ctrl step 200: |targets| max=3.14159  root_z=0.628
+    ctrl step 400: |targets| max=3.14159  root_z=0.002
+
+**Reset works.** The root is placed at 1.036 m on the terrain, which is the reference's own
+height, and the reference is sound: 61 motions, 12629 frames, all finite, 30 fps, first-frame
+root z averaging 0.911 m.
+
+**The control works too, and that is the problem.** The targets are not zero. They sit at
+3.14159, which is pi, on nearly every step, and the body falls from 1.036 m to 0.002 m.
+
+### Why pi
+
+`build_pd_action_offset_scale` derives a 3 DOF joint's action range as
+
+    scale = min (2 * action_scale * max |limit|) pi
+
+Measuring the MJCF: 66 hinge joints, every one limited, and the span of every one is exactly
+360.0 degrees. So `max |limit|` is pi for all of them, the `min` selects pi, and the offset is
+zero. A normalised action of 1.0 becomes a **180 degree target on every joint**.
+
+So the policy is railing its output and the body is told to fold every joint to a half turn.
+
+### What not to do about it
+
+The obvious repair is to give the skeleton anatomical limits, and this project already has
+them formalised in `lean-humanoid-rom`. **That repair is wrong here.** `git status` on the
+MJCF is clean, so the file is upstream and unmodified, and the tracker that scores 0.9996 was
+trained against exactly those limits. Its actions are calibrated to a pi scale. Narrowing the
+range changes what an action means and invalidates the weights, and the MJCF has the testing
+hours behind it.
+
+The finding is recorded in `lean-humanoid-rom` instead, as a measurement with five decidable
+facts, and range of motion is positioned there as a **validator over motion** rather than a
+constraint a simulator holds. See that repository's pull request 3.
+
+### Two corrections
+
+The previous entry read `max_ctrl=0.0` as absent control and reasoned from it twice, once to
+blame the observations and once to blame the checkpoint. Both were wrong. The value was a
+`{:.1f}` print, the live trace shows pi, and the checkpoint and the reference are both sound.
+
+Reference state initialisation also starts a body in the ground. One reset landed at
+`root_pos=[88.2 69.8 0.147]` with 14 contacts, which is a body already lying down, because it
+samples a random frame of a random motion and some frames are floor frames. That is unnatural
+and it is unfair to a tracker, which is then asked to recover from a pose it did not choose.
