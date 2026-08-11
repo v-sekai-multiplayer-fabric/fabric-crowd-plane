@@ -461,3 +461,63 @@ At 30 Hz this is about 50000 frames, four times the mini set the three local run
 The skeleton is Godot's `GeneralSkeleton`, so 22 of the 23 SOMA bodies map by name or by an
 obvious rename. Only `Neck2` has no source, because VRM carries one neck bone where SOMA
 carries two. Anny supplies the SOMA rest pose that the split needs.
+
+## Generating the missing behaviours, and six ways it lies quietly
+
+Neither corpus holds standing, sitting, getting off the floor, or being jostled. Kimodo, an
+NVIDIA kinematic motion diffusion model, generates them and emits `somaskel77` directly, which
+is the target skeleton, so these clips need no retarget at all. It also ships foot contacts,
+which the O3DE clips do not have.
+
+Six things in this path produce a file that loads, passes every numeric check, and is wrong.
+They are written down because none of them announces itself.
+
+**1. A prompt separated by commas is one segment.** Kimodo splits a prompt on full stops and
+gives each piece its own span. `walks to a chair, sits down, waits, then stands up` is a single
+twelve second segment, and the model follows the first clause and abandons the rest. The clip
+sat down, fell to the floor, and stayed there for the last four seconds. Written as four
+sentences with `--duration "3 3 3 3"` the same request produces walk, sit, stand, walk away.
+
+**2. A number cannot tell whether the motion is the motion that was asked for.** The bad clip
+passed everything: 1.80 m tall, 1.70 m travelled, root error zero, units correct, no NaN. Two
+of the first four clips were wrong and every check was green on both. Drawing eight frames to a
+contact sheet and looking at it took seconds and showed both failures at once. A second clip
+prompted for a shove stood almost still for eight seconds. `render_motion.py` exists for this.
+
+**3. `somaskel77` is a ROOT node plus 77 joints.** The shipped T-pose BVH holds 78. The model
+emits the 77, so the ROOT is dropped and the rest reparented.
+
+**4. The skeleton is centimetres and the motion is metres, in the same model.** The BVH offsets
+put the hips 100 units up; the generated motion puts them at 1.002. One is divided and the
+other is not. Anny's SOMA rig is centimetres too, and read as metres it describes a skeleton
+154 m tall.
+
+**5. USD holds a translation in the last row, numpy in the last column.** A matrix handed
+across without a transpose writes a file that opens and animates and is wrong. Both converters
+read their own output back and compare against the source.
+
+**6. `Gf` constructors take Python floats.** A numpy scalar matches no overload and raises from
+inside Boost.Python with a message naming only C++ signatures.
+
+USD is the intermediate rather than BVH or FBX. BVH states neither unit nor axis, so every
+reader guesses, which is how faults 3 and 4 stay hidden. FBX needs a vendor SDK. A `UsdSkel`
+file carries `metersPerUnit`, the up axis, the rest pose, and the animation in one readable
+place, and foot contacts ride along as `weft:footContacts`.
+
+### The text encoder is gated, and the way around it has a trap
+
+Kimodo encodes text with LLM2Vec over Llama-3-8B-Instruct, which Meta gates by hand. The
+weights are mirrored ungated at `NousResearch/Meta-Llama-3-8B-Instruct` and the LLM2Vec
+adapters are open, so the encoder is assembled from both.
+
+`prepare_for_tokenization` applies the Llama-3 chat template only when `config._name_or_path`
+is exactly `meta-llama/Meta-Llama-3-8B-Instruct`. So McGill's config is kept verbatim and only
+the weight files come from the mirror. Renaming it to the mirror still runs, and silently
+changes every embedding the model is conditioned on.
+
+### What is generated is kinematic
+
+These clips are poses, not forces. Nothing here actuates anything. A motion tracker is what
+turns a kinematic reference into a policy driving the 66 SOMA degrees of freedom as PD
+targets, which the SOMA model card calls the PD-control contract. The corpus is the reference
+for that training and is not itself a controller.
