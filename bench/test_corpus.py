@@ -68,6 +68,15 @@ def test_the_motion_matching_datasets_are_refused():
         assert tag == "error", "%s was admitted" % p
 
 
+def test_blocked_nested_inside_allowed_is_still_blocked():
+    """The order the path is scanned in must not decide the answer."""
+    for p in ("/opt/weft-motion/quaternius/mixamo_rig/Walk.glb",
+              "/opt/weft-motion/o3de-motion-matching/lafan1/walk.bvh",
+              "/opt/weft-motion/addb/amass/subject/x.npz"):
+        tag, why = admissible(p)
+        assert tag == "error", "%s was admitted via the allowed directory above it" % p
+
+
 def test_a_mixamo_compatible_rig_is_not_mixamo():
     """Quaternius says its rig is Mixamo-compatible. That is a bone naming scheme, not a
     source. But a path that names mixamo is still refused, because the rule matches on the

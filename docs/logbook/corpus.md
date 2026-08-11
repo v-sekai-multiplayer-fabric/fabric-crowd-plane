@@ -277,3 +277,21 @@ finds Max Planck and Ubisoft. The two categories that actually clear are:
 
 Both are cases where somebody had a commercial reason to own their assets outright. No
 research dataset in this field is in that position, which is why none of them clear.
+
+### The rule had a hole, and the CC0 entry found it
+
+Adding Quaternius exposed a bug in `classify` that had been there since the first version.
+It walked the path one component at a time and returned on the first component that matched
+anything, checking blocked and then allowed within each component. So
+
+    /opt/weft-motion/quaternius/mixamo_rig/Walk.glb
+
+was admitted. `quaternius` matched at the third component and the function returned before it
+ever saw `mixamo_rig`.
+
+That is the exact shape a corpus goes wrong in: a blocked source dropped inside an allowed
+directory. It is not a hypothetical, it is how anyone would organise a download.
+
+`classify` now scans the whole path for a blocked name before it considers any allowed one.
+Blocked wins wherever it appears. The regression test covers three nestings, because the same
+hole admits `o3de-motion-matching/lafan1/` and `addb/amass/` just as readily.

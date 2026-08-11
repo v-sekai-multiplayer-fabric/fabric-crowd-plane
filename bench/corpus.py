@@ -79,10 +79,17 @@ def classify(path):
     `mixamo_conversions` is the same source. A user called `maximo` is not.
     """
     parts = [p.lower() for p in os.path.normpath(path).split(os.sep) if p]
+
+    # Blocked wins wherever it appears. Scanning for allowed first, component by component,
+    # admitted `quaternius/mixamo_rig/Walk.glb`: the allowed directory matched before the
+    # blocked one was ever reached. A blocked source nested inside an allowed one is exactly
+    # how a corpus goes wrong, so the whole path is checked for blocked names first.
     for p in parts:
         for name in BLOCKED:
             if name in p:
                 return ("ok", name)
+
+    for p in parts:
         for name in ALLOWED:
             # A delivery names itself after its source and then adds to it, with either
             # separator: `o3de-motion-matching`, `addb_v2`. The bare name counts too.
