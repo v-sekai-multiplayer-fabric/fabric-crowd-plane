@@ -328,3 +328,46 @@ The clips that already work are the better answer. Klian's `anim_ue4_gettingup_u
 `_down` in `/opt/weft-motion/fab-cc-by` are 12.2 s of **real capture** of exactly this, CC BY,
 already downloaded. Against a 450 s target that is 3 per cent, and 3 per cent of real motion
 beats ten synthetic clips of a body lying still.
+
+## Rank by what a controller can press, and the list inverts
+
+The corpus was being filled by what was interesting to generate. That is not the same list
+as what a player can ask for, and nobody checked.
+
+A gamepad emits a stick vector, a look vector, and a few buttons. A VR rig emits a head pose
+and two hand poses. Ranked by what those can produce, most-pressed first, with what covers
+each row today:
+
+| rank | the player does | the input | covered by |
+| --- | --- | --- | --- |
+| 1 | stand idle | stick centred | 100STYLE ID, 200 clips |
+| 2 | walk, any heading | stick partly deflected | 100STYLE FW, BW, SW, 600 |
+| 3 | turn in place | look axis | 100STYLE TR, 220 |
+| 4 | start, stop, change direction | stick moving | 100STYLE TR, 220 |
+| 5 | **recover from a push** | **no input at all** | VR Balance Disturbance |
+| 6 | run | stick fully deflected | 100STYLE FR, BR, SR, 600 |
+| 7 | jump | a button | generated |
+| 8 | crouch | a button | generated |
+| 9 | sit and stand | interaction, at a prop | generated, **and no prop in the scene** |
+| 10 | get up off the floor | **nothing** | Klian, 12.2 s of real capture |
+
+**No controller has an input for getting up off the floor.** It is not a command and never
+was. It happens after a fall, which makes it a tail of row 5 rather than an entry of its own,
+and it is the row that took the most work in this project so far.
+
+Rank 9 is worse than low. A sit needs something to sit on, `places.py` says so, and five
+props are built and converted and **not placed in any scene**. Generating more sitting motion
+before a seat exists in the room is filling a column of a table whose other column is empty.
+
+### What this changes
+
+Everything from rank 1 to 6 is already downloading. 100STYLE's eight motion types are not a
+style catalogue that happens to contain walking. **They are the stick disc, decomposed:**
+centred, forward, back, sideways, each at a walk and a run, plus the transitions between them,
+sampled a hundred times over in different styles. 1620 clips against a surface with about six
+distinct rows.
+
+So the corpus for the top six ranks is not a gap. It is on disk and converting, and the work
+left on it is conversion rather than acquisition. **The gap is downstream**, at the controller
+that turns a stick vector into one of those clips and at the tracker that makes a body follow
+it, which is where `max_ctrl = 0.0` still sits.
