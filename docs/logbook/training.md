@@ -340,3 +340,38 @@ It does not say the policy is useless. Nothing here has run it. The curves say i
 something and stopped, and reading a curve is not the same as watching a body walk. Running
 the checkpoint is a separate job and it belongs before any further training, because it is the
 only measurement that answers what the training was for.
+## The tracker was never asked to do anything
+
+The plan's first step was cheap and decisive: run NVIDIA's pretrained `motion_tracker/soma-bones`
+against a reference and see whether it stands. If a tracker somebody else trained on our
+skeleton works, most of the rest is assembly.
+
+It does not stand, and the reason is not the tracker.
+
+On Newton it put exactly one environment non-finite whatever the batch size, 1 of 64 and then
+1 of 8, and protomotions **asserts** on non-finite state rather than resetting that
+environment, so a 98 per cent healthy run scores nothing. That looked like a fragile
+simulator, and it was written up here as one.
+
+On MuJoCo, which is the backend the crowd plane actually uses, the per-step trace says what is
+really happening:
+
+    [Step  901] root_vel=[39, -77, 77]    max_dof_vel=2254      max_ctrl=0.0
+    [Step 8601] root_vel=[956, 539, 376]  max_dof_vel=200126    max_ctrl=0.0
+
+**`max_ctrl` is zero at every one of 87 logged steps.** `max_ctrl` is `data.ctrl`, which is the
+actuators. The body is unactuated, contact throws it to 2254 rad/s by step 901, and the NaN
+follows from that. The tracker is not failing to track. Nothing is driving the body.
+
+The model is not the problem either: `soma23_humanoid.xml` carries 67 motors, and the MuJoCo
+backend has the whole control path, `_setup_control_parameters`, `_apply_torques_to_ctrl`, and
+a position-actuator conversion for `BUILT_IN_PD`. Actuators exist, control code exists, and
+`data.ctrl` stays zero between them.
+
+**This is the second time this exact fault has been found in this project.** The first was our
+own plane, where `d.ctrl` was never assigned and 26 actuators sat dead through every
+measurement in `body.md`, including an armature derivation that reasoned from actuator
+saturation that was not running. Two codebases, same diagnosis: nothing is driving the body.
+
+No verdict on the pretrained tracker is possible until that is fixed, and the earlier note
+here calling Newton fragile is withdrawn: it may be, but this run is not evidence of it.
