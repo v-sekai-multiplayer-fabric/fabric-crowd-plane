@@ -445,3 +445,34 @@ across the navigable space and then scored:
 The lesson is not the furniture, it is the direction. Do not author a sit and hope the world
 suits it. Generate candidate spots from the world, score them, and reject the zeros. Under
 that rule a pelvis at 0.55 m with no support scores zero and never becomes a reference.
+
+### Where a box stops being a chair
+
+A solid box at 0.45 m is a seat and nothing else. A real chair is a seat plate on legs, and
+the difference is not decoration: **there is no space under a solid box for feet.** Sitting
+puts the feet back under the knees, standing up drags them further back still, and a body
+that cannot do that either clips through the prop or learns a way of standing that no chair
+allows. The same holds for a table, where the whole point is the volume underneath.
+
+So the catalogue is right for support and wrong for clearance. Boxes stay for step, ledge,
+bench top and floor, which really are solid, and anything with a void under it needs the void.
+
+Constructive solid geometry is the cheap way to get one. Godot's CSG runs on **Manifold**
+since 4.4, so a union of a seat plate and four legs, or a seat with the underside subtracted,
+is a watertight mesh rather than a pile of intersecting boxes, and watertight is what a
+collision mesh has to be. `v-sekai-multiplayer-fabric/vsekai-godot-mcp` is MIT and drives an
+editor over MCP with `create_node`, `call_method` and `call_singleton`, which is enough to
+build the CSG tree and to call `GLTFDocument` on it. Headless works too, and needs no addon.
+
+The licence position does not change, which is the point of doing it this way. A CSG tree is
+a few numbers and a boolean op, so a prop built from one carries no more licence than the box
+it replaces, and after this session's corpus sweeps that is the property worth protecting.
+
+One conversion sits in the way. protomotions resolves a scene object path to `obj`, `stl` or
+`ply`, so a glTF out of Godot needs one more step before `MeshSceneObject` will take it. The
+crowd plane's own MJCF takes a mesh directly.
+
+**What is still true is that a box is enough to start.** Three sitting clips failed for want
+of any support at all, not for want of leg room, and a seat plate at the right height fixes
+the first fault today. Leg clearance is the second fault, and it will show up as a body that
+sits correctly and puts its feet through the chair.
