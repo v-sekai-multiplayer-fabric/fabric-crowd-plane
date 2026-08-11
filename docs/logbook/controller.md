@@ -479,3 +479,33 @@ simulator, which does not exist. Each of those was suspected here in turn and ea
 
 It is the MuJoCo model setup. The tracker was trained in IsaacLab, and this is the MuJoCo port
 of that model diverging on its first step.
+
+## Force limits are not the fault, and the fault is there before control
+
+The MJCF sets `forcerange` on none of its 66 actuators, so nothing bounds the force MuJoCo
+applies. protomotions carries an effort limit per actuator and prints it at startup, and in
+implicit PD mode never imposes it. Applying it to the model at run time, from the limits
+protomotions already holds:
+
+    forcerange applied to 66 actuators, median limit 300
+    step 0  root_z=1.045  |qacc|=2.609e+06  ncon=2   warn=none
+    step 1  root_z=-0.180 |qacc|=1.736e+08  ncon=30  mjWARN_BADQACC
+
+**No change.** The body still diverges on the first step and MuJoCo still restores `qpos0`.
+
+The reason is in the first line and it is worth more than the experiment. `qacc` is 2.6 million
+**at step 0**, at a correctly placed standing pose, with two contacts, and before any actuator
+force is applied at all. A clamp on the actuators cannot help, because the actuators were never
+the source.
+
+The bare MJCF at the same pose gives 5900. So the model protomotions builds is about 440 times
+worse than the file it is built from, before control enters.
+
+### What is left
+
+Five suspects are now eliminated with evidence: the checkpoint, the reference motion, the reset,
+the passive joint springs, and the actuator force limits. The divergence exists in the state
+protomotions hands to the first step, so what remains is what protomotions does to the model
+between loading it and stepping it. It strips a `<sensor>` element, adds five projectile bodies
+as free joints, and sets the timestep. The projectiles are the interesting one, because they are
+bodies that the file did not have and the reference knows nothing about.
