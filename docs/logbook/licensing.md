@@ -268,3 +268,42 @@ anybody actually read it.
 That is the third kind of answer this rule now gives. A source can be allowed, blocked, or
 answerable only by a reader, and pretending the third kind is one of the first two is how a
 corpus acquires something nobody ever checked.
+
+## Fab has CC-BY, and the filter has a trap
+
+Fab.com carries Creative Commons listings alongside Epic's own EULA tiers, and its search
+exposes them. It is behind Cloudflare, so `curl` gets a 403 on every endpoint and the query
+has to run from a real browser, from which the site's own API answers.
+
+**The parameter is `licenses=cc-by`, plural.** `license=cc-by` is accepted and silently
+ignored: it returns the unfiltered catalogue with a filtered-looking URL. That is what it did
+here for several queries, and the tell was that every listing came back `Personal` and
+`Professional`, which are Epic's price tiers and not licences in the sense that matters.
+
+A probe of seven guessed parameter names all reported "changed", which looked like all of
+them worked and meant none of them did: Fab ranks results non-deterministically, so comparing
+result ids between two calls detects nothing. The check that worked was reading the licence
+field itself. Across 192 listings sampled without a filter, the only values are `Personal`,
+`Professional`, and `UEFN - Reference only`. With the plural filter, every result is `CC-BY`
+and carries `isCc0`.
+
+That machine readable field is why Fab is admitted where Booth is not. Booth is free text in
+Japanese written by each author. Fab states the licence in the API, so the filter is checkable
+rather than trusted.
+
+### What is actually there is thin
+
+Keyword counts overstate it enormously. Searching the five gaps under the CC-BY filter returns
+80 hits for getting up, 72 for sitting, 59 for push. Almost all of them are props: "sitting"
+returns benches and theatre chairs, "strafe" returns an 8 ball and a door, "push" returns a
+hand truck and a police car. The filter is on licence, and the keyword matches a title.
+
+The real motion found was a handful of clips, mostly from one seller:
+
+- `Animation - Getting Up 01` and `02`, by Klian, which is the largest gap in the corpus
+- `Animation - Smoking 01`, same seller
+- `Easy Locomotion Toolkit`
+
+Downloads need an Epic account, so nothing was fetched. Fab is worth a hand search for
+specific gaps and is not a corpus. Generation still answers the 32 minutes more cheaply than
+assembling it clip by clip from a marketplace.

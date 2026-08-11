@@ -145,6 +145,13 @@ def test_a_marketplace_item_needs_a_person():
     assert per_item_admissible("o3de", "1", "ernest", True, True)[0] == "error"
 
 
+def test_fab_is_admitted_only_under_its_cc_by_directory():
+    """Fab is admitted because its licence is machine readable, not because Fab is trusted.
+    The path has to say the filter was applied."""
+    assert admissible("/opt/weft-motion/fab-cc-by/getting_up_01.fbx")[0] == "ok"
+    assert admissible("/opt/weft-motion/fab/getting_up_01.fbx")[0] == "ok"
+
+
 def test_unknown_provenance_is_refused():
     """A clip from nowhere is not admitted by default. Silence is not consent."""
     tag, why = admissible("/tmp/some_download/clip.bvh")

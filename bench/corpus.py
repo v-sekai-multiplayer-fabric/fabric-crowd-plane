@@ -77,6 +77,12 @@ ALLOWED = {
              "needs reading before any of it trains a policy weft ships. `sam` stays "
              "blocked so the features and checkpoints cannot become training data by "
              "accident.",
+    "fab": "Fab.com CC-BY listings only. Unlike a marketplace with free-text author terms, "
+           "Fab exposes a machine readable licence on each listing, so the filter is "
+           "checkable rather than trusted: `licenses=cc-by` on `/i/listings/search`, and the "
+           "listing carries `licenses[].name` and `isCc0`. Note the plural. `license=cc-by` "
+           "is accepted and silently ignored, which returns the unfiltered catalogue looking "
+           "like a filtered one. Downloads need an Epic account.",
     "quaternius": "Quaternius Universal Animation Library, CC0 1.0. Public domain, so there "
                   "is nothing to inherit and nothing to attribute. 120+ animations at 30 fps "
                   "on a retargetable humanoid rig, with root motion on all locomotion. Its "
