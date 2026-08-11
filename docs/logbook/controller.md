@@ -227,3 +227,40 @@ The plane gains a second input path that bypasses the controller entirely, and t
 a channel that is not joint rotations and does not compress like them. Neither is costed in
 `wire.md`, which measures body pose only, and both should be before the topology is called
 settled.
+
+## max_ctrl is zero because the policy sends zero, not because the sim ignores it
+
+`max_ctrl=0.0` had stood as the blocker for the tracker verdict. Reading the write path first:
+the config is `built_in_pd` in every checkpoint, which reaches
+`self.data.ctrl[self._dof_to_actuator] = targets` with no branch that can skip it, and the log
+shows the map built as 66 DOFs to 66 actuators with kp from 200 to 800. Nothing there is
+wrong, so the interesting question was whether the sim was stepping at all.
+
+A probe of the bare MJCF in plain MuJoCo, with no protomotions in the process:
+
+| ctrl | after 0.5 s | max joint movement |
+| --- | --- | --- |
+| 0.0 | root at −4.90 m, free fall, 2 contacts | — |
+| 0.3 | root at −4.90 m | **0.2981 rad** |
+
+**The actuators work.** A commanded 0.3 produces 0.298 of movement, so the MJCF, the actuator
+transmissions and the gains are all sound.
+
+The probe also corrected two readings of the eval log. The model's rest root is `[0, 0, 0]`,
+so `root_pos=[0.00, 0.00, 0.00]` for twenty thousand steps is the **default pose untouched**
+rather than a body held at the origin. And `ncon=27` against the probe's 2 is a body resting
+on the heightfield with many contacts, not a body pinned. The intermediate reading, that the
+harness was replaying kinematically, does not survive either number.
+
+The MJCF timestep is 0.002, since 500 steps fell 4.90 m and that is one second of gravity.
+The inference config reports `fps=1000`, which is 0.001.
+
+### Where that leaves it
+
+The write path works, so `targets` are zero, so `_common_actions` is zero. **The actions
+leave the policy as zeros**, and every measurement taken downstream of that is a measurement
+of an unactuated body falling over. `success_rate 0.000` from the three training runs says
+nothing about the training, and it never did.
+
+The next step is upstream of the simulator: whether the checkpoint's weights loaded, and
+whether the agent's output reaches `step()` at all.
