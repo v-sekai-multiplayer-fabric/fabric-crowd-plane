@@ -347,3 +347,38 @@ Reference state initialisation also starts a body in the ground. One reset lande
 `root_pos=[88.2 69.8 0.147]` with 14 contacts, which is a body already lying down, because it
 samples a random frame of a random motion and some frames are floor frames. That is unnatural
 and it is unfair to a tracker, which is then asked to recover from a pose it did not choose.
+
+## The tracker works. The reference observation explodes
+
+Wrapping `BaseEnv.get_obs` and the control path together finally shows the chain end to end.
+
+    obs dump 1   mimic_target_poses  max   1.029  mean 0.223
+    act step 0   |target| max 0.9615  railed 0.00  root_z 1.042
+
+    obs dump 2   mimic_target_poses  max 132.009  mean 18.017
+    act step 150 |target| max 3.1416  railed 0.88  root_z 0.002
+
+**On a sane observation the tracker emits a sane action and the body stands**, at 1.042 m with
+nothing at the limit. That is the first evidence in this project that the controller works at
+all, and it is the thing every previous measurement hid.
+
+Then `mimic_target_poses` grows by about two orders of magnitude, from a mean of 0.22 to a mean
+of 18.0 and a maximum of 132. From that step on, 88 to 97 per cent of the 66 joints sit at pi
+and the root stays at 0.002 m for the rest of the run. **The railing is the consequence, not
+the cause.** A network handed an input a hundred times outside its training range saturates,
+which is the correct behaviour for a network and tells us nothing about its weights.
+
+A factor near 100 in a project that has already had four unit faults is a suspicious number,
+and metres against centimetres is the shape of it. That is the next thing to check.
+
+`previous_actions` is all zero in every dump, which is a second thread and may be the same one.
+
+### Do not trust the built in state print
+
+The `[Step N]` line reports `root_pos=[0.00, 0.00, 0.00]` and `max_ctrl=0.0` at the same
+moments a direct read of the same tensors gives pi targets and a moving root, and it sometimes
+reports `max_dof_vel=200126`. A body frozen at the origin with 27 contacts, which occasionally
+explodes, is not the body being controlled. **There is very likely a second simulator instance**,
+and every number in the first three entries of this section came from it.
+
+So the earlier readings were not misinterpreted. They were measurements of the wrong object.
