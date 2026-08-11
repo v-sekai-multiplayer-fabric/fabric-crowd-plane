@@ -288,3 +288,43 @@ motion.
 
 The guard was wrong and still did its job: it refused rather than writing 1620 files of 2.7 m
 people that nobody would have questioned until training.
+
+## Getting up is not in the model, and constraints do not put it there
+
+The prompt route left three of five clips on the floor. The fix looked obvious: state the
+requirement with a full-body keyframe instead of describing it, which is what constraints are
+for. Both endpoints were taken from clips already checked by eye rather than typed in, frame 0
+of `getup_front` for lying and a late frame of `idle_stand` for standing, and the builder
+refuses an end pose spanning under 1.4 m or a start over 0.8 m.
+
+Ten samples. **Ten of ten start lying at 0.35 m and end standing at 1.71 m.**
+
+Those numbers are true and they mean nothing. 0.35 and 1.71 are the constraint values, so
+measuring frames 0 and 299 measures the constraint rather than the motion. The clip:
+
+    0.0s  1.4s  2.8s  4.3s  5.7s  7.1s   prone, unchanged
+    8.5s                                 crouched
+    10.0s                                standing
+
+**Seven seconds of lying still, then a snap.** The model satisfied the endpoint by jumping to
+it in the last two seconds, because the transition between them is not something it knows.
+
+That is the third time in this project a green number has covered a wrong motion, after the
+comma prompts and the unactuated tracker, and the first time the failure was predicted before
+looking. The prediction is the only part worth keeping: a constraint is honoured at the frames
+it names and says nothing about the frames it does not.
+
+### What follows
+
+Getting up is not a prompt problem and not a constraint problem. **It is absent from the
+model.** Bones Rigplay is optical capture, and getting off the floor is rare in capture
+sessions, so it is thin in the training set and neither route can pull it out.
+
+Denser keyframes through the middle, hands and knees at three seconds and a crouch at six,
+would be the next thing to try, and it would be authoring the motion by hand one pose at a
+time rather than generating it.
+
+The clips that already work are the better answer. Klian's `anim_ue4_gettingup_up` and
+`_down` in `/opt/weft-motion/fab-cc-by` are 12.2 s of **real capture** of exactly this, CC BY,
+already downloaded. Against a 450 s target that is 3 per cent, and 3 per cent of real motion
+beats ten synthetic clips of a body lying still.
