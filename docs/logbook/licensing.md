@@ -307,3 +307,30 @@ The real motion found was a handful of clips, mostly from one seller:
 Downloads need an Epic account, so nothing was fetched. Fab is worth a hand search for
 specific gaps and is not a corpus. Generation still answers the 32 minutes more cheaply than
 assembling it clip by clip from a marketplace.
+
+## Two blocks that are not about licences
+
+The Fab sweep produced the first entries here whose problem is not who owns them.
+
+**Easy Locomotion Toolkit** is CC BY 4.0 and free, and it is blocked. It ships no motion. It
+is an Unreal Blueprint system that decides which animation to play, which is the thing weft
+is training a policy to do. It surfaced under a locomotion keyword and was briefly written up
+as a find before anyone read what it was. Blocking it by name stops the next reader repeating
+that, and its entry says the reason is category and not licence, because a blocklist that
+does not distinguish the two teaches the wrong lesson.
+
+**Props cannot be blocked by name at all.** Under a CC-BY filter, searching the five gaps
+returned 80 hits for getting up, 72 for sitting, 59 for push, and almost none of them were
+motion: benches and theatre chairs for `sitting`, an 8 ball and a door for `strafe`, a hand
+truck and a police car for `push`. The licence filter answered who owns it. The keyword
+matched a title. Nothing checked the middle, which is what the thing actually is.
+
+Enumerating props is unwinnable, so `motion_admissible` defaults to no. A candidate is motion
+when it can demonstrate motion: animation tracks, at least two frames, a stated frame rate,
+and at least eight joints. A single pose is not a motion. A rate nobody stated is a duration
+nobody knows. `Rhino Animation Walk` is animated and is still refused, at four joints, because
+it is not a body.
+
+That is the same shape as the provenance rule, which refuses a clip from nowhere rather than
+listing every place a clip must not come from. Both default to no and ask the candidate to
+show its working.

@@ -44,6 +44,13 @@ BLOCKED = {
                "`assets/ubisoft_bvh` inside an MIT repository is still CC BY-NC-ND.",
     "bandai": "Bandai Namco Research motion datasets 1 and 2, CC BY-NC 4.0. Only the Blender "
               "visualisation utility beside them is MIT.",
+    "easy-locomotion-toolkit": "Unreal Engine Blueprint locomotion system, CC BY 4.0 and "
+        "free. Blocked on CATEGORY and not on licence, which makes it the first entry here "
+        "that is not a licensing decision. It ships no motion: it is the logic that decides "
+        "which animation to play, which is the thing weft is training a policy to do. It "
+        "surfaced in a Fab search under a locomotion keyword the same way a theatre chair "
+        "surfaced under `sitting`, and it was briefly reported as a find. Blocking it keeps "
+        "the next reader from repeating that.",
     "sam": "Meta SAM-3D-Body, under the custom SAM License. It carries no non-commercial "
            "clause, so it is not blocked for that. It is blocked because the licence is "
            "bespoke and not OSI approved, and it adds trade control and ITAR terms, a "
@@ -114,6 +121,30 @@ PER_ITEM = {
              "rather than motion, so it is unlikely to be the answer to a corpus question "
              "even where an item permits use.",
 }
+
+
+def motion_admissible(name, frames=0, fps=0, joints=0, has_animation=False):
+    """Whether a candidate is motion at all, before anyone asks whose it is.
+
+    A licence filter answers who owns a thing. It does not answer what the thing is, and the
+    Fab sweep showed how far apart those are: under a CC-BY filter, `sitting` returned benches
+    and theatre chairs, `strafe` returned an 8 ball and a door, `push` returned a hand truck
+    and a police car. Eighty hits, almost none of them motion. The filter matched the licence
+    and the keyword matched the title, and nothing checked the middle.
+
+    Enumerating props is unwinnable, so this defaults to no. A candidate is motion when it
+    demonstrates motion: animation tracks, a frame count, a rate, and joints. Anything that
+    cannot show those is refused whatever its name suggests.
+    """
+    if not has_animation:
+        return ("error", "%s declares no animation, so it is a model and not motion" % name)
+    if frames < 2:
+        return ("error", "%s has %d frames; a pose is not a motion" % (name, frames))
+    if fps <= 0:
+        return ("error", "%s states no frame rate, so its duration is unknown" % name)
+    if joints < 8:
+        return ("error", "%s has %d joints, too few to be a body" % (name, joints))
+    return ("ok", {"name": name, "seconds": frames / float(fps), "joints": joints})
 
 
 def per_item_admissible(source, item_id, terms_read_by, permits_training, permits_redistribution):

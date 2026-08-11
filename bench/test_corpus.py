@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from corpus import (admissible, classify, filter_corpus, roots, ROOT, BLOCKED, ALLOWED,
-                    video_admissible, per_item_admissible)
+                    video_admissible, per_item_admissible, motion_admissible)
 
 
 def test_mixamo_is_refused():
@@ -103,6 +103,38 @@ def test_a_tool_is_kept_but_its_dependency_is_not_training_data():
     for p in ("/opt/weft-motion/sam-3d-body/checkpoints/sam3d_body.ckpt",
               "/data/sam3d/features.npz"):
         assert admissible(p)[0] == "error", "%s was admitted" % p
+
+
+def test_props_are_refused_however_they_are_named():
+    """These are real results from a CC-BY animation search. The licence was fine and the
+    keyword matched. None of them are motion."""
+    for prop in ("Bench", "Theater Chair - Red Plaid", "8 Ball - Billiard",
+                 "Wooden hand truck low poly 3D", "Police car", "PUERTA 8", "CC0 - Chair 8"):
+        tag, why = motion_admissible(prop, has_animation=False)
+        assert tag == "error", "%s was admitted as motion" % prop
+        assert "not motion" in why
+
+
+def test_motion_must_show_its_working():
+    ok = motion_admissible("gettingup_up", frames=776, fps=120, joints=60, has_animation=True)
+    assert ok[0] == "ok" and abs(ok[1]["seconds"] - 6.47) < 0.01
+    # a single pose is not a motion
+    assert motion_admissible("T-pose", frames=1, fps=30, joints=60, has_animation=True)[0] == "error"
+    # a rate nobody stated means a duration nobody knows
+    assert motion_admissible("clip", frames=300, fps=0, joints=60, has_animation=True)[0] == "error"
+    # an animated prop is still not a body
+    assert motion_admissible("Rhino Animation Walk", frames=200, fps=30, joints=4,
+                             has_animation=True)[0] == "error"
+
+
+def test_engine_logic_is_not_motion():
+    """The blocklist also refuses things whose licence is fine and whose category is not.
+    A locomotion Blueprint is the decision a controller makes, not data it learns from."""
+    for p in ("/opt/weft-motion/fab-cc-by/easy-locomotion-toolkit/BP_Locomotion.uasset",
+              "/downloads/Easy-Locomotion-Toolkit/readme.txt"):
+        tag, why = admissible(p)
+        assert tag == "error", "%s was admitted" % p
+        assert "CATEGORY" in why or "category" in why
 
 
 def test_the_soma_path_stays_clean():
