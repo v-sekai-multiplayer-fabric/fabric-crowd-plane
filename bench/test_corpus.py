@@ -77,11 +77,14 @@ def test_blocked_nested_inside_allowed_is_still_blocked():
         assert tag == "error", "%s was admitted via the allowed directory above it" % p
 
 
-def test_a_mixamo_compatible_rig_is_not_mixamo():
-    """Quaternius says its rig is Mixamo-compatible. That is a bone naming scheme, not a
-    source. But a path that names mixamo is still refused, because the rule matches on the
-    path and a file that says mixamo cannot be told apart from one that is."""
+def test_a_rig_naming_scheme_is_not_a_source():
+    """`mixamorig` is a bone prefix. Original work that uses it is still original work.
+    A directory called `mixamo` claims something else: that the clips came from there."""
     assert admissible("/opt/weft-motion/quaternius/Walk_Fwd.glb")[0] == "ok"
+    assert admissible("/opt/weft-motion/quaternius/mixamorig/Walk.glb")[0] == "ok"
+    assert admissible("/opt/weft-motion/quaternius/mixamorig_retarget/Walk.glb")[0] == "ok"
+    # the source claim, which stays refused
+    assert admissible("/opt/weft-motion/quaternius/mixamo/Walk.glb")[0] == "error"
     assert admissible("/opt/weft-motion/quaternius/mixamo_rig/Walk.glb")[0] == "error"
 
 

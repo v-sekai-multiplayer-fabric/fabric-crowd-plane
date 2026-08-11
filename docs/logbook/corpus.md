@@ -295,3 +295,22 @@ directory. It is not a hypothetical, it is how anyone would organise a download.
 `classify` now scans the whole path for a blocked name before it considers any allowed one.
 Blocked wins wherever it appears. The regression test covers three nestings, because the same
 hole admits `o3de-motion-matching/lafan1/` and `addb/amass/` just as readily.
+
+### A rig naming scheme is not a source
+
+`mixamorig` is a bone prefix. It appears inside files whose motion is entirely their author's,
+and a large part of the retargeting ecosystem references it, Godot's humanoid mapping among
+them. What Mixamo licenses is the animation data, the curves. A set of bone names is short
+strings, and a skeleton hierarchy is mostly dictated by where human joints are rather than by
+anyone's choice.
+
+So the rule now strips any component beginning `mixamorig` before it looks for a blocked name.
+Original work does not become someone else's for using a naming convention.
+
+A directory called `mixamo` is left refused, because that is a different claim: it says where
+the clips came from. `mixamo_rig`, with the separator, stays refused too. It could be either,
+and the rule matches on a path and cannot ask.
+
+This is a tooling decision and not a legal opinion. The distinction between a functional
+naming interface and the licensed work is the ordinary one and the industry relies on it, but
+nothing here has been through a lawyer, and it should be before it carries weight in a release.

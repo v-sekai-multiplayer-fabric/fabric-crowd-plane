@@ -80,6 +80,12 @@ def classify(path):
     """
     parts = [p.lower() for p in os.path.normpath(path).split(os.sep) if p]
 
+    # `mixamorig` is a bone naming scheme, not a source. It appears as a bone prefix inside
+    # files that hold nobody's data but their author's, and half the retargeting ecosystem
+    # references it. Blocking it would refuse original work for using a naming convention.
+    # A directory called `mixamo` is a different claim: that is where the clips landed.
+    parts = [p for p in parts if not p.startswith("mixamorig")]
+
     # Blocked wins wherever it appears. Scanning for allowed first, component by component,
     # admitted `quaternius/mixamo_rig/Walk.glb`: the allowed directory matched before the
     # blocked one was ever reached. A blocked source nested inside an allowed one is exactly
