@@ -136,3 +136,33 @@ gait wearing five sizes.
 
 The population sampled from has to be written down with the corpus. A distribution nobody
 states is a default nobody chose, and the default here is whatever body the generator emits.
+
+## Two real get-up clips, and a file that lies about which way is up
+
+Two CC-BY clips of getting up off the floor were downloaded by hand from Fab: Klian's
+`anim_ue4_gettingup_up` and `_down`, 12.2 s together at 120 fps on the UE4 mannequin. Getting
+up is the largest gap in the corpus, 10 s held against 450 s wanted, so this is real mocap of
+exactly the missing behaviour and it is 3 per cent of the gap. It is a reference to check
+generated get-ups against rather than a way to fill it.
+
+They arrived as USDZ, which is the intermediate this repo already chose, and two of the three
+traps that keeps producing showed up again inside them.
+
+**Centimetres, stated.** `metersPerUnit` is 0.01. That is now the fourth source with a unit
+that is not metres, after Anny, the somaskel77 BVH, and the two halves of Kimodo that
+disagree with each other. USD states it, which is the whole argument for USD.
+
+**The declared up axis is wrong.** The stage says `upAxis = Y` and the bind pose spans 162.7
+cm in Z against 21.5 cm in Y. It is UE4 data and UE4 is Z-up, and the exporter wrote the axis
+metadata without moving the data under it. Measured on Y the skeleton is 0.21 m tall.
+
+The guard that catches this is the one already written for the Anny converter: refuse a
+skeleton that is not between 0.5 and 2.5 m. It works here without modification, and it works
+because it asks whether the result is a person rather than whether the metadata is
+self-consistent. A file can be internally consistent and still be wrong.
+
+**The joint names are gone.** The Skeleton names its 60 joints `n8` to `n67`. Three real names
+survive in the Xform tree above it, `root_01`, `pelvis_02`, `spine_01_03`, and the rest have
+to be recovered by matching the topology to the published UE4 mannequin hierarchy. That is
+deterministic and it is work, and it is not done. Kimodo emits SOMA names already, which is
+the cheaper 97 per cent of this gap.
