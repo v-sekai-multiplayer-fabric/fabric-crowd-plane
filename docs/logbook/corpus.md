@@ -441,3 +441,36 @@ agree, and **the VRM is the outlier at 9 per cent short**. So the silhouette is 
 against Anny, and the physics motors stay valid: inertia goes as mass times length squared,
 so 1.1 per cent of length is 2.2 per cent of inertia, against a 2.7 times hip torque spread
 already covered across the Anny range.
+
+## One of six generated families is the motion that was asked for
+
+The gaps against the O3DE reference set were crouch, jump and pushes. Pushes cannot be read,
+so six families were generated for the other two, ten samples each.
+
+| family | measured | verdict |
+| --- | --- | --- |
+| `jump_run` | lowest body rises **0.212 m**, travel 11.83 m in 7 s | **a jump.** Loads at 2.0 s, airborne at 3.0 s, lands and runs on |
+| `jump_place` | root falls to 0.47 m, lowest body rises 0.017 m | not a jump. It is a deep knee bend that never leaves the ground |
+| `jump_down` | | untested |
+| `crouch_idle` | root 0.96 to 0.99 m, span 1.70 to 1.74 m for all 8 s | **not a crouch.** The figure stands upright throughout |
+| `crouch_walk` | root 0.80 to 0.91 m against 0.98 standing | barely bends |
+| `crouch_turn` | | untested |
+
+So one family in six produced the motion its prompt asked for, and it is the one that asked
+for the behaviour inside a run rather than on its own.
+
+**The crouch is in the wrong clip.** `jump_place` drops its root to 0.47 m, which is a deeper
+crouch than anything the three crouch prompts produced, and the three crouch prompts produced
+none at all. Asking for a crouch as a preparation for something else worked. Asking for it as
+the behaviour did not.
+
+That is consistent with the four earlier refusals, and it sharpens what they mean. Getting up,
+sitting and crouching are all rare as **the point of a capture session** and common as
+**transitions inside one**, and this model holds motion the way its corpus did.
+
+### What it costs the database
+
+Motion matching does not need a clip labelled crouch. It needs frames whose features match a
+crouched query, and `jump_place` contains those regardless of its name. A clip is a bag of
+frames to this controller, so a mislabelled clip is still usable and a missing behaviour is
+not. The label matters to a person reading the corpus and not to the search.
