@@ -395,3 +395,53 @@ repository with a proof beside it.
 That is worth more than the eleven milliseconds. An hour of work was about to go into a
 component the architecture had already replaced, and the only thing that caught it was reading
 the implementation instead of the moduledoc that described it.
+
+## Places to sit, because a sit needs something under it
+
+Three of the five generated sitting clips put the pelvis at 0.54 to 0.55 m and held it there
+for seconds. That is a real chair height and there was no chair. Kimodo generates a body and
+nothing else, and the simulator has no furniture either, so the reference asks for a
+quasi-static pose in mid air and the physics can only drop the body. **The motion was never
+wrong. The world was missing.**
+
+`bench/places.py` is the world. For physics a chair is a box: what a body needs from a chair
+is a support surface at a height, clearance for the legs, and an edge to push off. No art is
+required, and a primitive carries no licence, which is more than any mesh in this project can
+say.
+
+| place | height | why that number | what it teaches |
+| --- | ---: | --- | --- |
+| step | 0.18 | IRC maximum riser 0.197 m | stepping up and down, sitting on a kerb |
+| ledge | 0.30 | low wall | perching, pushing up with the hands |
+| sofa | 0.40 | lounge seating, 0.38 to 0.43 | a deep low sit and the hard rise out of it |
+| chair, bench | 0.45 | EN 1729 adult seat height, 0.43 to 0.46 | sit, settle, stand |
+| stool | 0.65 | counter stool for a 0.90 m surface | perching with the feet unsupported |
+| table | 0.74 | EN 527 work surface, 0.72 to 0.76 | leaning on, pushing off, waist obstacle |
+| floor | 0 | every scene already has one | cross legged, lying, and getting up |
+
+**No height here was chosen.** Seat and step heights are ergonomic and building standards and
+each row names the one it comes from, in the same way `motors.py` takes torque from measured
+maxima rather than from a number that felt right. A row that cannot cite a standard is a bug.
+
+The catalogue also gives the check that was missing. A body seated on a support has its pelvis
+about 0.06 m above it, so a chair means a pelvis at 0.51 m. The three failed clips sat at 0.54
+to 0.55. They were not nonsense, they were **furniture-shaped motion with no furniture**, and
+that is now testable rather than something to notice by eye.
+
+protomotions takes these directly: `BoxSceneObject` with width, depth and height is a first
+class primitive, and `--scenes-file` passes them to a training run. It ships no scenes of its
+own. `places.py --mjcf` emits the same set for the crowd plane, and the file loads in MuJoCo
+with seven bodies whose top surfaces measure back at the stated heights.
+
+### Where this came from
+
+Naughty Dog's post system, from Allen Chou's GDC 2023 talk, whose transcript is in
+`/opt/weft-talks`. A post is a spot in the world picked for a gameplay purpose, generated
+across the navigable space and then scored:
+
+> We rate or score each post using a set of post criteria. And if the final score is zero, we
+> reject a post.
+
+The lesson is not the furniture, it is the direction. Do not author a sit and hope the world
+suits it. Generate candidate spots from the world, score them, and reject the zeros. Under
+that rule a pelvis at 0.55 m with no support scores zero and never becomes a reference.
