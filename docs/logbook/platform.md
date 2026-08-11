@@ -523,3 +523,37 @@ perfect time; only the ratio between simulated time and real time shows it.
 Both planes now take two substeps for each frame. `SUBSTEPS` and `kSubsteps` sit next to the
 timestep with the reason written down, because the two numbers are one decision and changing
 either alone is this bug.
+
+## One plane for tools, and why it is not an edge
+
+Each new capability had been wanting its own repository, container and Fly app: one to build
+props, one to convert motion, one to generate. Every one is a deploy, an image push and a
+cold start for a job that runs for seconds. A tool has no tick, holds no state between calls,
+and does not need a core to itself, so it is not a plane in its own right. One plane with a
+tool table is the shape that fits, and a new capability is a row.
+
+`v-sekai-multiplayer-fabric/fabric-tool-plane` holds it.
+
+The first draft called itself an edge, reasoning that MCP is a wire protocol and that
+`CLAUDE.md` defines an edge as a plane with networking. That was wrong about MCP rather than
+about the rule. **MCP is JSON-RPC framing**, and stdio and HTTP are conventions around it
+rather than part of it. The frames ride iceoryx2 and there is no networking left, so it is a
+plane and needs no exception.
+
+The transport is worth more here than the naming. A tool call carries a mesh, a motion or a
+stage, and 100STYLE alone unpacks to 3.2 GB. Over HTTP every call is a serialise, a copy and a
+parse. Over the bus the caller writes the bytes once and the tool reads the same bytes. A
+plane also has no socket to defend, and every other plane already reaches the bus, so a tool
+becomes callable from the crowd plane exactly as the store is.
+
+### The engine is dlopened, like iceoryx2
+
+Whether to hold a Godot editor warm or shell out per call looked like a design question and
+was not: both are subprocess management, and neither is how this project reaches a native
+library. `fabric-harness` decided this once, for iceoryx2, and wrote down why: a `.sigs` file
+of the C ABI, `generate_stubs.py` emitting a dlsym dispatch table, nothing on the link line,
+and a failure at start with a named symbol rather than a failure to link.
+
+`sigs/libgodot.sigs` applies it to Godot. The list is deliberately short, the libgodot entry
+point and `godot_get_proc_address`, because everything else goes through the pointers that
+call returns. The pinned ABI surface is one function rather than a 14000 file engine.
