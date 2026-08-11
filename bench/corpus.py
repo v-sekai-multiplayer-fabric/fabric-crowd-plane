@@ -12,6 +12,10 @@ Return values are `("ok", value)` or `("error", reason)`. Nothing here raises.
 """
 import os
 
+# Where a corpus lives on a machine that has one. It is on `/` and not on `/tmp`, because a
+# session scratchpad is tmpfs and a corpus that only exists in RAM is one reboot from gone.
+ROOT = "/opt/weft-motion"
+
 # Blocked, with the reason attached. A name without a reason is a name nobody can re-argue.
 BLOCKED = {
     "mixamo": "Terms cover use of the animations in a project. A trained policy carries the "
@@ -25,6 +29,9 @@ ALLOWED = {
             "Reached weft through godot-motion-matching-demo, which credits it.",
     "mmdemo": "godot-motion-matching-demo. Carries the o3de clips and nothing else. "
               "Confirm against the Gem's own licence header before shipping a policy.",
+    "anny": "Anny, NAVER, Apache-2.0. Not motion but the SOMA rig and rest pose. It is "
+            "declared here because a retarget built on it carries it into the output, so "
+            "its terms travel with a shipped policy exactly as a clip's do.",
 }
 
 
@@ -40,7 +47,9 @@ def classify(path):
             if name in p:
                 return ("ok", name)
         for name in ALLOWED:
-            if p == name or p.startswith(name + "_"):
+            # A delivery names itself after its source and then adds to it, with either
+            # separator: `o3de-motion-matching`, `addb_v2`. The bare name counts too.
+            if p == name or p.startswith(name + "_") or p.startswith(name + "-"):
                 return ("ok", name)
     return ("error", "no known source in %r" % path)
 
@@ -53,6 +62,20 @@ def admissible(path):
     if val in BLOCKED:
         return ("error", "%s is blocked: %s" % (val, BLOCKED[val]))
     return ("ok", val)
+
+
+def roots():
+    """The corpus directories on this machine, each with the source it holds."""
+    found = []
+    for name in sorted(ALLOWED):
+        d = os.path.join(ROOT, name)
+        if os.path.isdir(d):
+            found.append((name, d))
+    # o3de arrives under a directory naming its delivery, not the source.
+    d = os.path.join(ROOT, "o3de-motion-matching")
+    if os.path.isdir(d):
+        found.append(("o3de", d))
+    return ("ok", found)
 
 
 def filter_corpus(paths):

@@ -6,7 +6,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from corpus import admissible, classify, filter_corpus, BLOCKED, ALLOWED
+from corpus import admissible, classify, filter_corpus, roots, ROOT, BLOCKED, ALLOWED
 
 
 def test_mixamo_is_refused():
@@ -35,6 +35,16 @@ def test_o3de_locomotion_is_admitted():
     for p in ("scratchpad/mmdemo/animation/animations/WalkTurns1.res",
               "/data/o3de/MotionMatching/Jumps1.res"):
         assert admissible(p)[0] == "ok", why_failed(p)
+
+
+def test_a_delivery_may_extend_its_source_name():
+    """`o3de-motion-matching` is o3de. This is how the corpus is laid out on disk."""
+    for p, want in (("/opt/weft-motion/o3de-motion-matching/Walk1.res", "o3de"),
+                    ("/opt/weft-motion/addb/train/x.b3d", "addb"),
+                    ("/opt/weft-motion/addb_v2/x.b3d", "addb")):
+        tag, val = admissible(p)
+        assert tag == "ok", why_failed(p)
+        assert val == want, "%s classified as %s" % (p, val)
 
 
 def test_unknown_provenance_is_refused():
@@ -66,6 +76,17 @@ def test_filter_reports_what_it_dropped():
     assert len(keep) == 2
     assert len(drop) == 1
     assert "mixamo" in drop[0][1]
+
+
+def test_nothing_blocked_lives_in_the_corpus_root():
+    """The corpus directory is what a training run reads. Nothing blocked may be inside it."""
+    if not os.path.isdir(ROOT):
+        return
+    for name, d in roots()[1]:
+        assert admissible(os.path.join(d, "x"))[0] == "ok", "%s is a corpus root but not admitted" % d
+    bad = [e for e in os.listdir(ROOT)
+           if os.path.isdir(os.path.join(ROOT, e)) and admissible(os.path.join(ROOT, e, "x"))[0] != "ok"]
+    assert not bad, "unadmitted directories in the corpus root: %s" % bad
 
 
 def test_the_real_corpus_on_this_machine_is_clean():
