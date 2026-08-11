@@ -240,3 +240,40 @@ the CMU page did not return anything parseable.
 family, each with its reason, and `test_corpus.py` asserts each is refused under the name it
 actually arrives as. `assets/ubisoft_bvh` inside an MIT repository is the case that matters:
 nothing about the path says LAFAN1, and nothing about the repository says non-commercial.
+
+## CC0, which is the category the search kept missing
+
+Every source above was searched for as a dataset, and datasets in this field are almost all
+non-commercial. The category that is not is game art: assets an artist made to be used, put
+into the public domain outright.
+
+**Quaternius Universal Animation Library** is CC0 1.0. Not a permissive licence with terms to
+inherit, but public domain, so there is nothing to attribute and nothing to carry into a
+policy's weights. It holds 120+ animations at 30 fps on a retargetable humanoid rig, and its
+contents are close to the gap list this logbook has been keeping:
+
+- locomotion in **8 directions**, which is the decoupled facing the O3DE clips have only 10
+  per cent of
+- **sitting**, which nothing else here has
+- **push**, which is the interaction a touchable crowd is made of
+- crawling, swimming, jog, sprint, death
+- **root motion on every locomotion clip** since v3.0, which is what AddBiomechanics lacks
+
+Its rig is described as compatible with other rigs, Mixamo among them. That is a bone naming
+scheme and not a source: the animations are original work. The blocklist still refuses any
+path containing `mixamo`, because a rule that matches on the path cannot tell a compatible rig
+from the real thing, and a false refusal is cheap where a false admission is not.
+
+The download is name-your-own-price and needs a browser session, so it is not scripted here.
+Nothing has been fetched yet.
+
+### What the whole search says
+
+Sorting by licence finds MIT repositories wrapping non-commercial mocap. Sorting by dataset
+finds Max Planck and Ubisoft. The two categories that actually clear are:
+
+1. **An engine or an open movie that had to clear its own assets.** O3DE.
+2. **Game art released as CC0.** Quaternius, Kenney.
+
+Both are cases where somebody had a commercial reason to own their assets outright. No
+research dataset in this field is in that position, which is why none of them clear.

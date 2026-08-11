@@ -64,6 +64,11 @@ ALLOWED = {
                      "conditions generation, so its terms reach the output.",
     "hf-cache": "Hugging Face download cache. Holds copies of the above and nothing whose "
                 "terms are not already recorded here.",
+    "quaternius": "Quaternius Universal Animation Library, CC0 1.0. Public domain, so there "
+                  "is nothing to inherit and nothing to attribute. 120+ animations at 30 fps "
+                  "on a retargetable humanoid rig, with root motion on all locomotion. Its "
+                  "rig is described as compatible with other rigs including Mixamo, which is "
+                  "a naming convention and not a source: the animations are original.",
 }
 
 

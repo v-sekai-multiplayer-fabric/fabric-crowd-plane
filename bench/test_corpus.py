@@ -68,6 +68,14 @@ def test_the_motion_matching_datasets_are_refused():
         assert tag == "error", "%s was admitted" % p
 
 
+def test_a_mixamo_compatible_rig_is_not_mixamo():
+    """Quaternius says its rig is Mixamo-compatible. That is a bone naming scheme, not a
+    source. But a path that names mixamo is still refused, because the rule matches on the
+    path and a file that says mixamo cannot be told apart from one that is."""
+    assert admissible("/opt/weft-motion/quaternius/Walk_Fwd.glb")[0] == "ok"
+    assert admissible("/opt/weft-motion/quaternius/mixamo_rig/Walk.glb")[0] == "error"
+
+
 def test_the_soma_path_stays_clean():
     """SOMA exists so there is a body model that is not SMPL. It must not be caught by it."""
     for p in ("/opt/weft-motion/kimodo-generated/idle_stand.usda",
