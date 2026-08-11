@@ -1,0 +1,37 @@
+From dae1bc87abeed2b95126e19231a3940ed94f7aa7 Mon Sep 17 00:00:00 2001
+From: "K. S. Ernest (iFire) Lee" <ernest.lee@chibifire.com>
+Date: Tue, 11 Aug 2026 04:30:28 -0700
+Subject: [PATCH] Bound the explicit PD slice to the humanoid's own DOFs
+
+---
+ protomotions/simulator/mujoco/simulator.py | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/protomotions/simulator/mujoco/simulator.py b/protomotions/simulator/mujoco/simulator.py
+index 8e6f797..05fec4e 100644
+--- a/protomotions/simulator/mujoco/simulator.py
++++ b/protomotions/simulator/mujoco/simulator.py
+@@ -576,12 +576,16 @@ class MujocoSimulator(Simulator):
+         if self._pd_targets_sim is None:
+             return
+ 
++        # Bound the slice to the humanoid's own DOFs. Projectile bodies are appended to the
++        # MJCF as free joints, so qpos runs past the humanoid and an unbounded slice gives
++        # 101 values where the gains have 66. _print_state_debug already bounds it this way.
++        n = self._num_actuated_dofs
+         if self._has_free_joint:
+-            q = self.data.qpos[7:]
+-            qd = self.data.qvel[6:]
++            q = self.data.qpos[7 : 7 + n]
++            qd = self.data.qvel[6 : 6 + n]
+         else:
+-            q = self.data.qpos[:]
+-            qd = self.data.qvel[:]
++            q = self.data.qpos[:n]
++            qd = self.data.qvel[:n]
+ 
+         torques = self._kp_sim * (self._pd_targets_sim - q) - self._kd_sim * qd
+         torques = np.clip(torques, -self._effort_limits_sim, self._effort_limits_sim)
+-- 
+2.55.0
+
