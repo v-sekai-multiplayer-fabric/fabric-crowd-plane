@@ -236,3 +236,55 @@ distinction that admits a mixamo-compatible rig while refusing mixamo data.
 
 The one real cost is that the parser reads URDF and our body is MJCF, so the avatar needs
 converting before it can be a retarget target.
+
+## The gap generation, and where a prompt stops working
+
+Ten prompts, ten samples each, a hundred clips, all segmented into four sentences with their
+own durations because commas produce one segment and the model abandons everything after the
+first clause. That fix held. A different limit showed up behind it.
+
+Sitting works. Four of the five sitting clips span 1.76 to 1.85 m vertically, which is a body
+that starts standing and ends down.
+
+**Getting up mostly does not.**
+
+| clip | vertical span | |
+| --- | ---: | --- |
+| getup_kneel | 1.80 m | stands |
+| getup_back | 1.16 m | partial |
+| getup_sit | 0.95 m | partial |
+| getup_quick | 0.66 m | does not stand |
+| getup_front | 0.43 m | never leaves the floor |
+
+`getup_front` was prompted with four sentences: lies face down, pushes onto hands and knees,
+brings one foot forward, stands up. Every one of the eight sampled frames is prone. Ten
+seconds face down.
+
+This is not the comma fault again. The prompts were correct this time, and the model still
+would not do it. Floor-to-standing is rare in motion capture, so it is likely thin in Bones
+Rigplay as well, and a text prompt cannot pull a diffusion model into a region of the
+distribution it barely has.
+
+The fix is the constraint mechanism rather than another prompt sweep. A full-body keyframe
+pinning the pelvis at standing height in the final second states the requirement instead of
+describing it, which is what constraints are for and what `KimodoLocoMoGen` used in place of
+retraining. Not done yet.
+
+**Sitting is closed. Getting up is half open.** The measured 878 s gap is therefore about half
+shut, and the remaining half needs authored constraints.
+
+## 100STYLE converts, once the ruler is right
+
+1620 BVH files unpack to 3.2 GB across style directories named `WalkingStickLeft`, `Rocket`,
+`Drunk`, `Aeroplane`. The first conversion pass refused **all forty** it tried:
+
+    no unit makes this a person: 272.56 in file units
+
+The data was fine. `pick_scale` summed every offset along each axis, which adds both legs to
+the spine and both arms, and over-counts height by more than half. A 1.7 m skeleton measured
+that way reads 2.7. Accumulating each offset down its own parent chain instead gives the real
+height, and then all forty convert, unit chosen by measurement as centimetres, 56.7 minutes of
+motion.
+
+The guard was wrong and still did its job: it refused rather than writing 1620 files of 2.7 m
+people that nobody would have questioned until training.
