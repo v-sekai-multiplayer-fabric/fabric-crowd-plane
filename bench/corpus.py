@@ -20,6 +20,18 @@ ROOT = "/opt/weft-motion"
 BLOCKED = {
     "mixamo": "Terms cover use of the animations in a project. A trained policy carries the "
               "corpus in its weights and is redistributed, which is not the same thing.",
+    # The next three are one restriction wearing three names. SMPL's licence says, in its own
+    # words, that it "prohibits the use of the Software to train methods/algorithms/neural
+    # networks/etc. for commercial use of any kind". AMASS carries the identical sentence.
+    # Anything built on either inherits it, whatever licence the builder puts on top.
+    "smpl": "Max Planck body model. Its licence bans training a network for commercial use "
+            "of any kind, in those words. SMPL-X and SMPL+H are the same licence.",
+    "amass": "Max Planck motion corpus, same clause as SMPL. HumanML3D is derived from it, "
+             "so every model trained on HumanML3D inherits the ban: MDM, MoMask, MotionGPT, "
+             "T2M-GPT, MotionLCM, StableMoFusion.",
+    "humenv": "Meta HumEnv and Meta Motivo, CC BY-NC 4.0. The body is SMPL-derived and the "
+              "motions are AMASS, so the non-commercial term is inherited and Meta could not "
+              "have granted otherwise. Closest match to our topology and still unusable.",
 }
 
 # Allowed, with what makes the provenance checkable.
@@ -32,6 +44,14 @@ ALLOWED = {
     "anny": "Anny, NAVER, Apache-2.0. Not motion but the SOMA rig and rest pose. It is "
             "declared here because a retarget built on it carries it into the output, so "
             "its terms travel with a shipped policy exactly as a clip's do.",
+    "kimodo": "Kimodo, NVIDIA. Apache-2.0 code, NVIDIA Open Model Licence weights, trained "
+              "on commercially-friendly capture and emitting somaskel77. Covers the "
+              "checkout, the generated clips, and the corpus built from them.",
+    "text-encoders": "Llama-3-8B-Instruct weights from an ungated mirror plus the open "
+                     "LLM2Vec adapters. Meta's Llama 3 Community Licence applies. It "
+                     "conditions generation, so its terms reach the output.",
+    "hf-cache": "Hugging Face download cache. Holds copies of the above and nothing whose "
+                "terms are not already recorded here.",
 }
 
 

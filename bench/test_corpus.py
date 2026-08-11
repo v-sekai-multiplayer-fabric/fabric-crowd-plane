@@ -47,6 +47,24 @@ def test_a_delivery_may_extend_its_source_name():
         assert val == want, "%s classified as %s" % (p, val)
 
 
+def test_the_smpl_family_is_refused():
+    """One restriction under several names. Each must be caught by the name it arrives under."""
+    for p in ("/data/smpl/SMPL_NEUTRAL.pkl",
+              "/data/amass/CMU/01/01_01_poses.npz",
+              "models/humenv/assets/robot.xml",
+              "protomotions/data/pretrained_models/motion_tracker/smpl/last.ckpt"):
+        tag, why = admissible(p)
+        assert tag == "error", "%s was admitted" % p
+
+
+def test_the_soma_path_stays_clean():
+    """SOMA exists so there is a body model that is not SMPL. It must not be caught by it."""
+    for p in ("/opt/weft-motion/kimodo-generated/idle_stand.usda",
+              "protomotions/data/pretrained_models/motion_tracker/soma-bones/last.ckpt"):
+        assert admissible(p)[0] != "error" or "unknown provenance" in admissible(p)[1], why_failed(p)
+    assert admissible("/opt/weft-motion/anny/src/anny/data/soma/soma_rig.pt")[0] == "ok"
+
+
 def test_unknown_provenance_is_refused():
     """A clip from nowhere is not admitted by default. Silence is not consent."""
     tag, why = admissible("/tmp/some_download/clip.bvh")
@@ -84,9 +102,13 @@ def test_nothing_blocked_lives_in_the_corpus_root():
         return
     for name, d in roots()[1]:
         assert admissible(os.path.join(d, "x"))[0] == "ok", "%s is a corpus root but not admitted" % d
+    # __pycache__ is the interpreter's, not a corpus.
     bad = [e for e in os.listdir(ROOT)
-           if os.path.isdir(os.path.join(ROOT, e)) and admissible(os.path.join(ROOT, e, "x"))[0] != "ok"]
-    assert not bad, "unadmitted directories in the corpus root: %s" % bad
+           if os.path.isdir(os.path.join(ROOT, e)) and e != "__pycache__"
+           and admissible(os.path.join(ROOT, e, "x"))[0] != "ok"]
+    assert not bad, ("undeclared directories in the corpus root: %s. Every directory here "
+                     "must name its source in corpus.py, because a policy trained from this "
+                     "root carries all of it." % bad)
 
 
 def test_the_real_corpus_on_this_machine_is_clean():

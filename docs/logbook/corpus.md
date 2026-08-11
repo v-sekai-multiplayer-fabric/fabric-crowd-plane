@@ -136,3 +136,60 @@ These clips are poses, not forces. Nothing here actuates anything. A motion trac
 turns a kinematic reference into a policy driving the 66 SOMA degrees of freedom as PD
 targets, which the SOMA model card calls the PD-control contract. The corpus is the reference
 for that training and is not itself a controller.
+
+## Meta's body, and why one licence explains the whole field
+
+Meta's HumEnv is the closest match to our target that exists. 24 rigid bodies with 23
+actuated, a 69-dimensional PD action space against our 66, MuJoCo, and a body its own
+README describes as "tuned for more realistic behaviors (friction, joint actuation, and
+movement range)", which are the two things ours was measured wrong on. Meta Motivo on top of
+it is a behavioural foundation model for zero-shot whole-body control, which is standing and
+sitting without training them.
+
+Both are CC BY-NC 4.0, and the reason is not a choice Meta made. The body is SMPL-derived,
+the motions are AMASS, and the SMPL licence says in its own words that it
+
+> prohibits the use of the Software to train methods/algorithms/neural networks/etc. for
+> commercial use of any kind.
+
+AMASS carries the identical sentence. Meta could not have granted otherwise, because Meta
+does not own the body model. So the restriction is inherited, not negotiable, and no amount
+of reading the repository differently changes it.
+
+That single clause explains the shape of the whole field. HumanML3D is built from AMASS, so
+every model trained on HumanML3D inherits it, and that is MDM, MoMask, MotionGPT, T2M-GPT,
+MotionLCM, and StableMoFusion. Their MIT and Apache badges are on the code. The weights carry
+Max Planck.
+
+### SOMA exists to escape exactly this
+
+`NVlabs/SOMA-X` is Apache-2.0, and its README makes the intent plain. It ships **SOMA-shape**,
+a PCA body model of NVIDIA's own, described as offering SMPL-like functionality with 128
+coefficients. SMPL support is an optional extra, `py-soma-x[smpl]`, and the SMPL files
+themselves "require a separate license". Anny is a listed supported model, which is why Anny
+carries a SOMA rig at all.
+
+So the clean stack was not assembled by taste. It is the only one that closes:
+
+| piece | source | terms |
+| --- | --- | --- |
+| body shape | Anny, NAVER | Apache-2.0 |
+| skeleton | SOMA-X, NVIDIA | Apache-2.0 |
+| robot config | protomotions `soma23` | Apache-2.0 |
+| generated motion | Kimodo-SOMA | NVIDIA Open Model |
+| locomotion clips | O3DE | Apache-2.0 or MIT |
+| gait with forces | AddBiomechanics | per-study |
+
+Checked on this machine: `py-soma-x` is installed without the `smpl` extra, no chumpy, and no
+SMPL model file anywhere on disk. Three SMPL-derived checkpoints do sit inside protomotions
+and must not be used: `masked_mimic/smpl`, `motion_tracker/smpl`, `motion_tracker/smpl-terrains`.
+The `soma-bones` variants beside them are clean.
+
+`bench/corpus.py` now blocks `smpl`, `amass`, and `humenv` by name, each with the reason
+attached, and `test_corpus.py` asserts that the SOMA path is *not* caught by those rules. A
+blocklist that also blocked the thing we depend on would be discovered late and by hand.
+
+The test also refuses any undeclared directory in the corpus root. It fired immediately on
+`kimodo-src`, `hf-cache`, and `text-encoders`, which were directories added without saying
+where they came from. The Llama weights that condition generation are now recorded too,
+because they reach the output as surely as a clip does.
