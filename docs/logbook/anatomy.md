@@ -112,3 +112,38 @@ flat 300 N m was hiding.
 The second row is the one worth reading twice. A 55 kg muscular body lands within two per
 cent of the 70 kg reference at the hip, because muscularity makes up what mass does not. Pure
 mass scaling would have made it 40 per cent weaker and wrong.
+
+## Rendering the body, and four ways SOMA-X says no
+
+Stick figures caught two of the first four generated clips being wrong. A body catches more,
+because a pose can be joint-correct and still read as inhuman. SOMA-X carries Anny as a
+first-class identity model, so `bench/anny_render.py` poses the corpus on the body the corpus
+is actually about.
+
+Four mismatches, each a one-line fix, none of them documented:
+
+- `SOMA_procedural_transforms.json` is not in the released assets, so the layer must be built
+  with `enable_procedural_transforms=False`.
+- Correctives then require those transforms, so `apply_correctives=False` as well.
+- MHR **asserts** on a missing `scale_params` rather than defaulting.
+- The `anny` on PyPI predates `create_fullbody_model`, which py-soma-x calls. Our own checkout
+  at `/opt/weft-motion/anny` has it, so installing the checkout over the wheel fixes it.
+
+### The scale parameter is not a number
+
+Passing `ones` to satisfy the MHR assert produced a body **2.0 m tall**. Sweeping a single
+scalar down to 0.70 still produced 1.96 m, which is when it became clear the sweep was the
+wrong shape of answer: **MHR has 45 identity coefficients and 68 scale parameters.** Scale is
+per segment, not global, so setting all 68 to one value is not a height and searching over
+that value cannot find one.
+
+This is the fourth scale or unit error in this project, after Anny's centimetres, the
+somaskel77 skeleton disagreeing with the motion beside it, and the Fab USDZ declaring Y-up
+over Z-up data. The pattern is identical every time and it is not really about units: **a
+number was supplied to get past an error rather than derived from something measured.** The
+assert existed precisely because there is no sensible default, and it was answered with a
+guess.
+
+The right fix is to solve the 68 parameters for a stated height, with the population coming
+from Anny's conditional distributions, which is the same machinery `motors.py` already uses to
+scale actuators from height and mass. Not done yet.
