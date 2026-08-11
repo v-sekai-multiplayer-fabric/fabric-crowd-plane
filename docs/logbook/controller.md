@@ -264,3 +264,32 @@ nothing about the training, and it never did.
 
 The next step is upstream of the simulator: whether the checkpoint's weights loaded, and
 whether the agent's output reaches `step()` at all.
+
+## The checkpoint is trained, and 0.0 was a print format
+
+The actions leave the policy as zeros, so the next suspect was the checkpoint. It is not.
+
+| | |
+| --- | --- |
+| epoch | 56800 |
+| best evaluated score | **0.99960** |
+| model tensors | 31, none of them entirely zero |
+| action head `_actor.mu.mlp.12` | (66, 1024), so 66 outputs for 66 DOFs |
+
+NVIDIA scored this tracker at 0.9996 on its own evaluation. The weights are trained, they are
+intact, and the head is the right width for our skeleton.
+
+Then the head's bias settles what `max_ctrl` was really showing. Its maximum is **0.0458**.
+A network given degenerate observations returns approximately its final bias, so a policy that
+sees nothing useful emits about 0.046 rad. The debug line formats as `max_ctrl={:.1f}`.
+
+**0.046 prints as 0.0.**
+
+So the control was probably never zero. It was one decimal place hiding a number far too small
+to hold a body up, which looks exactly like no control and is not the same fault. This is the
+second time in this project a formatted number has been read as a measurement, after the
+constraint endpoints, and both times the fix was to look at what produced the digits.
+
+That moves the suspect from the policy to what the policy is fed. A tracker that scores 0.9996
+on correct observations and collapses on ours is an observation plumbing fault, and plumbing is
+assembly rather than research.

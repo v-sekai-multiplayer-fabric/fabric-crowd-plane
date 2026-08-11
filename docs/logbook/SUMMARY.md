@@ -63,3 +63,26 @@ Downloads: 3.3 of 22.9 GB, about two hours left.
 
 **Three deployed apps still run the old build.** `weft-room` and `weft-plane` carry the
 substep code and the unbounded drive.
+
+## What this repository is trying to reach
+
+Written down because it was asked for three times, and an answer that has to be re-derived
+each time is not written down anywhere.
+
+**The target is a crowd that stands and can be shoved, at `weft-view.fly.dev`.**
+
+It is reached when all of these are true:
+
+1. A body holds a still stand for 10 seconds without falling.
+2. It walks on a stick vector, and turns.
+3. Pushed, it takes a step and recovers rather than collapsing.
+4. More than one body does this at once, and they collide.
+5. It is the deployed build, not a local run.
+
+Today, rows 1 to 5 are all false. The deployed room shows bodies in a heap at 0.110 m from a
+build that predates the substep fix.
+
+Everything else in this logbook is support for row 1. The corpus is the reference the
+controller follows, the body is what it drives, the wire is how it arrives, and none of them
+is the blocker. **The blocker is a controller that holds a body upright**, and the nearest
+route to one is the pretrained tracker, which scores 0.9996 for NVIDIA and collapses here.
