@@ -17,6 +17,11 @@ question a reader arrives with is always about a subject.
 `../../spec/CrowdBudget.lean` holds the budget these feed. It holds the arithmetic and this
 holds the measurements. `../../PLAN.md` says what is being built.
 
+## Start here
+
+`SUMMARY.md` is one page: what was broken, what the corpus may contain, how much motion is
+missing, and the plan. Everything below is the working detail behind it.
+
 ## The books
 
 | file | what is in it |

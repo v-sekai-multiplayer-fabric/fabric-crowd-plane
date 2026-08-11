@@ -57,6 +57,11 @@ BLOCKED = {
         "parameters, and physiological data including heart rate and ECG. Its own paper is "
         "titled 'a new behavioral biometric dataset for USER IDENTIFICATION in XR', which is "
         "the finding that matters: XR motion identifies the person who made it.",
+    "mdm-weights": "Motion Diffusion Model CHECKPOINTS. The code is MIT and is cribbable, "
+        "and this entry is only about the weights: MDM trains on HumanML3D, which is built "
+        "from AMASS, so a checkpoint carries the Max Planck clause that bans training a "
+        "network for commercial use. Archived rather than deleted, because the training loop "
+        "and the geometric losses beside them are the reference implementation worth reading.",
     "sam": "Meta SAM-3D-Body, under the custom SAM License. It carries no non-commercial "
            "clause, so it is not blocked for that. It is blocked because the licence is "
            "bespoke and not OSI approved, and it adds trade control and ITAR terms, a "
