@@ -371,3 +371,16 @@ So the corpus for the top six ranks is not a gap. It is on disk and converting, 
 left on it is conversion rather than acquisition. **The gap is downstream**, at the controller
 that turns a stick vector into one of those clips and at the tracker that makes a body follow
 it, which is where `max_ctrl = 0.0` still sits.
+
+## 100STYLE is converted, and half of it was never there
+
+    converted 810, refused 810, 1327.7 minutes
+    units chosen by measurement: {'centimetres': 810}
+
+Half refused looks like a failure and is not one. Every refusal is a file named `._Foo.bvh`,
+which is an AppleDouble resource fork. The archive was packed on macOS, so each real file has
+a junk sibling, and 1620 entries are 810 motions. **All 810 converted**, and the corpus is
+**22.1 hours**, measured as centimetres in every single file rather than assumed.
+
+Against a 450 s target for the gaps, this is 177 times over, and it covers ranks 1 to 4 and 6
+of the controller surface on its own.

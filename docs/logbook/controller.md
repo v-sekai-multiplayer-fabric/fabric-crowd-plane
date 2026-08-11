@@ -382,3 +382,49 @@ explodes, is not the body being controlled. **There is very likely a second simu
 and every number in the first three entries of this section came from it.
 
 So the earlier readings were not misinterpreted. They were measurements of the wrong object.
+
+## The body diverges first, and everything else follows
+
+    frame   0   |obs| max      1.520      right after a reset
+    frame  60   |obs| max    141.104      about a second later
+    frame 360   |obs| max  29852.102
+
+29852 is not a tracking error. It is a body blowing up, and it matches the `max_dof_vel` of
+200126 seen in the same runs. So the order of events is settled, and it runs the opposite way
+to the order they were found in:
+
+1. Something diverges within about a second of a reset.
+2. `mimic_target_poses` follows it, from a mean of 0.22 to a maximum of 141 and then 29852.
+3. The policy sees an input a hundred times outside its training range and rails at pi.
+4. A railed target against `kp=800` asks for a torque the effort limit clips at 300.
+5. That drives more divergence, and the loop closes on itself.
+
+The policy is the fourth step and not the first. It behaves correctly at step 4, which the
+first sane frame proves: at an observation of 1.52 it emits 0.96 with nothing at a limit and
+the body stands at 1.042 m.
+
+## Placing a body in MuJoCo, and why the origin is the wrong handle
+
+The rest origin of a model is not its standing pose. In `soma23_humanoid.xml` a `qpos` of all
+zeros puts the root at z of 0, and the lowest body of the reference sits 0.03 m below its own
+root. So a root written at z of 0 buries the feet, the solver answers with a large upward
+impulse, and the result is a constant velocity against a position that does not move. That is
+exactly the `root_vel` of 2.20 m/s beside a pinned root in the first traces.
+
+The order that works:
+
+1. Write the pose. Root position, root quaternion as wxyz, then the joint angles.
+2. Write the velocity in the same breath. A position written over a stale `qvel` is what makes
+   a placement look like an explosion.
+3. Clear what the previous state left. `ctrl` and `qfrc_applied` both go to zero.
+4. Run `mj_forward`, because nothing derived is valid until it has run.
+5. **Only now measure the lowest body and lift the root by the ground clearance.** The lowest
+   point is not knowable until the joints are posed, so this step cannot come earlier.
+
+ProtoMotions holds both halves of step 5 already, in
+`terrain.find_terrain_height_for_max_below_body` and in `ref_respawn_offset`.
+
+And a body under physics is not placed twice. A `qpos` write in the middle of an episode
+throws away momentum and contact state, so it reads as a jump however careful the write is.
+Either it is a reset, which is the sequence above, or it is control, and control moves a body
+with actuators toward a target instead of assigning it.
