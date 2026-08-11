@@ -512,3 +512,32 @@ For whoever picks this up: `nimblephysics` reads the AddBiomechanics `.b3d` file
 wheel for the Pythons installed here. **Use pixi.** That corpus is 52 GB of real human motion
 with a biomechanical skeleton, which is a far better source for this question than either a
 driven ragdoll or a Mixamo rig.
+
+## Janet on the packet path, measured
+
+An edge decodes every datagram, so the language it is written in is a packet-rate decision
+rather than a taste. Janet was proposed for it, because the iteration is much faster than a
+C++ rebuild. The bar is **15 million snapshots per second per core**.
+
+The same work in both, on one machine: decode a 12-byte entity update, a `u32` slot and two
+`f32` positions, and apply it to a resident slab.
+
+| | rate | against the bar |
+| --- | --- | --- |
+| C++, `memcpy` decode | **841.51 M/s** | 56 times over |
+| Janet, byte assembly | 5.70 M/s | **2.6 times under** |
+| Janet, `ffi/read` | 4.16 M/s | 3.6 times under |
+
+**C++ is 148 times faster**, and its 841.51 reproduces the 840 M/s in the SUMO entry from
+different hardware, so the measurement is sound.
+
+Janet misses the minimum bar by 2.6 times, and that is the generous reading. The loop above
+decodes and nothing else. A real edge also runs QUIC, the crypto, the dispatch, and the
+iceoryx2 publish on the same packet, so the achievable rate is lower than 5.70.
+
+`ffi/read` being slower than byte assembly is worth noting for anyone who assumes the FFI
+path is the fast one. It is a call through a foreign interface per field, and the call costs
+more than four indexed byte reads.
+
+So the edge is C++. Janet remains a good harness beside it, driving it from outside and
+faking clients, where it runs at the rate a person types.
