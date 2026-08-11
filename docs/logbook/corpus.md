@@ -384,3 +384,60 @@ a junk sibling, and 1620 entries are 810 motions. **All 810 converted**, and the
 
 Against a 450 s target for the gaps, this is 177 times over, and it covers ranks 1 to 4 and 6
 of the controller surface on its own.
+
+## Motion matching, and the body all three formats agree on
+
+The learned controller was dropped. Four sessions of it ended at a diagnosis rather than a
+standing body, and the only prod runtime is a CPU under the Fly budget, which rules out both
+IsaacLab and Newton. Motion matching does not train, runs on a CPU, and the corpus already
+answers the whole input surface.
+
+### The corpus covers the reference set, and beats it in two axes
+
+The O3DE demo clips are the reference, and 100STYLE covers them:
+
+| O3DE | covered by |
+| --- | --- |
+| Walk, Jog, Run | `FW`, `FR`, 200 clips |
+| Acceleration, MixedLocomotion, FreeRoaming | `TR1` to `TR3`, 220 |
+| TurnOnSpot, WalkTurns, the pivot turns, Circles, Snake | `TR` and `ID` |
+| **nothing** | **`BW`, `BR`, `SW`, `SR`, 400 clips.** O3DE captured no backward and no sideways travel. |
+
+Three categories are missing, and only one of them matters.
+
+**Crouch and jump have no source.** The generated corpus turned out to be `sit_*` and
+`getup_*` only, which are ranks 9 and 10 of the controller surface. Generation was tried and
+**crouch failed**: `root_y` stayed at 0.96 to 0.99 m and the body span at 1.70 to 1.74 m for
+all eight seconds, and the contact sheet shows a figure standing upright throughout. That is
+the fourth behaviour Kimodo will not produce, after getting up by three separate routes and
+sitting in three clips of five. The pattern is consistent, and it is a property of optical
+capture rather than of the prompt.
+
+**Pushes cannot be read.** The VR Balance Disturbance files are `MatlabOpaque`, which is a
+MATLAB class instance rather than an array, so scipy cannot decode them. 6.7 GB, unusable
+without MATLAB. It matters less than it looks: a push reaction is physics acting on a body
+and not a clip to play.
+
+### One body, measured
+
+A retarget renames bones. Godot's humanoid retarget does more, and this is the part that was
+nearly missed: **it rectifies bone axes and standardises the silhouette against the profile.**
+A database built from raw BVH axes and a database built through that retarget describe
+differently oriented skeletons, and motion matching compares poses, so the two can never
+agree. The MuJoCo database has to be built from the retargeted result.
+
+The profile body is Anny, which is the licence-clean body and the one `bench/motors.py`
+already derives actuators for:
+
+| body | hip height | total height |
+| --- | --- | --- |
+| **Anny** | **1.012 m** | **1.771 m** |
+| 100STYLE capture | 0.975 m | 1.79 m |
+| O3DE capture, from its Hips track | 0.988 m | |
+| the demo VRM | 0.894 m | 1.285 m foot to head |
+
+Anny sits within 1.1 per cent of 100STYLE on height. The three captured and parametric bodies
+agree, and **the VRM is the outlier at 9 per cent short**. So the silhouette is standardised
+against Anny, and the physics motors stay valid: inertia goes as mass times length squared,
+so 1.1 per cent of length is 2.2 per cent of inertia, against a 2.7 times hip torque spread
+already covered across the Anny range.
