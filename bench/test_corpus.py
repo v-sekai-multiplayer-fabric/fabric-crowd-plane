@@ -70,7 +70,7 @@ def test_the_motion_matching_datasets_are_refused():
 
 def test_blocked_nested_inside_allowed_is_still_blocked():
     """The order the path is scanned in must not decide the answer."""
-    for p in ("/opt/weft-motion/quaternius/mixamo_rig/Walk.glb",
+    for p in ("/opt/weft-motion/quaternius/mixamo/Walk.glb",
               "/opt/weft-motion/o3de-motion-matching/lafan1/walk.bvh",
               "/opt/weft-motion/addb/amass/subject/x.npz"):
         tag, why = admissible(p)
@@ -83,9 +83,15 @@ def test_a_rig_naming_scheme_is_not_a_source():
     assert admissible("/opt/weft-motion/quaternius/Walk_Fwd.glb")[0] == "ok"
     assert admissible("/opt/weft-motion/quaternius/mixamorig/Walk.glb")[0] == "ok"
     assert admissible("/opt/weft-motion/quaternius/mixamorig_retarget/Walk.glb")[0] == "ok"
+    # a rig is published to be interoperated with, so its name is a convention not a source
+    for ok in ("mixamorig", "mixamo_rig", "mixamorig_retarget", "mixamo_skeleton",
+               "mixamo_compat", "mixamo-bones"):
+        p = "/opt/weft-motion/quaternius/%s/Walk.glb" % ok
+        assert admissible(p)[0] == "ok", "%s is a naming scheme: %s" % (ok, admissible(p)[1])
     # the source claim, which stays refused
-    assert admissible("/opt/weft-motion/quaternius/mixamo/Walk.glb")[0] == "error"
-    assert admissible("/opt/weft-motion/quaternius/mixamo_rig/Walk.glb")[0] == "error"
+    for bad in ("mixamo", "mixamo_animations", "mixamo_clips", "mixamo_downloads"):
+        p = "/opt/weft-motion/quaternius/%s/Walk.glb" % bad
+        assert admissible(p)[0] == "error", "%s claims a source and was admitted" % bad
 
 
 def test_the_soma_path_stays_clean():

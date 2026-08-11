@@ -80,11 +80,28 @@ def classify(path):
     """
     parts = [p.lower() for p in os.path.normpath(path).split(os.sep) if p]
 
-    # `mixamorig` is a bone naming scheme, not a source. It appears as a bone prefix inside
-    # files that hold nobody's data but their author's, and half the retargeting ecosystem
-    # references it. Blocking it would refuse original work for using a naming convention.
-    # A directory called `mixamo` is a different claim: that is where the clips landed.
-    parts = [p for p in parts if not p.startswith("mixamorig")]
+    # A naming scheme is not a source. `mixamorig` is a bone prefix, and a rig is published
+    # precisely so other people interoperate with it, so its name appearing in a path says
+    # which convention the bones follow, not where the motion came from. Blocking that would
+    # refuse original work for speaking a standard, which is what a standard is for.
+    #
+    # A directory called `mixamo` or `mixamo_animations` is a different claim: that is where
+    # the clips landed. The word after the source name is what separates the two.
+    RIG_WORDS = ("rig", "rigged", "skeleton", "skel", "bones", "naming", "compat",
+                 "compatible", "convention", "mapping", "retarget")
+
+    def is_naming_scheme(component):
+        for src in BLOCKED:
+            if not component.startswith(src):
+                continue
+            tail = component[len(src):].lstrip("_-")
+            if tail.startswith("rig"):            # mixamorig, mixamo_rig, mixamorig_retarget
+                return True
+            if tail in RIG_WORDS:
+                return True
+        return False
+
+    parts = [p for p in parts if not is_naming_scheme(p)]
 
     # Blocked wins wherever it appears. Scanning for allowed first, component by component,
     # admitted `quaternius/mixamo_rig/Walk.glb`: the allowed directory matched before the
