@@ -501,7 +501,7 @@ They are artefacts and are not committed.
 | --- | --- | --- |
 | `weft-plane` | the native C++ plane. No networking, as a plane should have none. | 60.0 Hz, worst frame 11.2 ms of 16.7 |
 | `weft-room` | the Python plane with a WebSocket, which the viewer needs | running |
-| `weft-view` | a hosted Viser scene server, so the crowd has a URL | https://weft-view.fly.dev |
+| ~~`weft-view`~~ | **deleted.** The viewer runs on the player's machine. See below. |
 
 Hosting the viewer is a demo convenience and not the architecture. **The browser is still the
 renderer.** What moved to the cloud is the scene bookkeeping that normally runs on the
@@ -557,3 +557,21 @@ and a failure at start with a named symbol rather than a failure to link.
 `sigs/libgodot.sigs` applies it to Godot. The list is deliberately short, the libgodot entry
 point and `godot_get_proc_address`, because everything else goes through the pointers that
 call returns. The pinned ABI surface is one function rather than a 14000 file engine.
+
+## The hosted viewer is deleted
+
+`weft-view` is gone, and the Fly app is destroyed. It held a Viser scene and served it to
+browsers, and the entry above already said what was wrong with it:
+
+> Hosting the viewer is a demo convenience and not the architecture. **The browser is still
+> the renderer.**
+
+So it hosted scene bookkeeping that belongs on the player's machine, and it cost the last hop
+its 22-byte packet. It was a demo convenience that had started to read as part of the stack.
+
+**The viewer itself is not deleted.** `proto/client.py` still draws the scene with Viser and
+still sends stick input back. It runs where it always should have, on the machine of the
+person watching, and it reaches `weft-room` over the same WebSocket the hosted copy used.
+
+What remains on Fly is `weft-plane`, which is the native C++ plane, and `weft-room`, which is
+the plane with the WebSocket. Two apps, and neither of them renders anything.
