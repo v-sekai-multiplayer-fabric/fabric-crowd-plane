@@ -127,6 +127,14 @@ def test_motion_must_show_its_working():
                              has_animation=True)[0] == "error"
 
 
+def test_motion_that_identifies_a_person_is_refused():
+    """Who is Alyx is non-commercial, and it is also 71 named people's eye tracking, heart
+    rate, and screen recordings. Its own paper shows XR motion is a biometric."""
+    for p in ("/data/whoisalyx/players/player_01/motion.csv",
+              "/opt/weft-motion/xr/who-is-alyx/summary.csv"):
+        assert admissible(p)[0] == "error", "%s was admitted" % p
+
+
 def test_engine_logic_is_not_motion():
     """The blocklist also refuses things whose licence is fine and whose category is not.
     A locomotion Blueprint is the decision a controller makes, not data it learns from."""

@@ -334,3 +334,42 @@ it is not a body.
 That is the same shape as the provenance rule, which refuses a clip from nowhere rather than
 listing every place a clip must not come from. Both default to no and ask the candidate to
 show its working.
+
+## The XR catalogue, and a claim in this logbook that was wrong
+
+`cschell/xr-motion-dataset-catalogue` has 25000 downloads and aligns nine XR motion datasets
+to one format. It states no licence of its own, and one of its nine says permissions are still
+pending, so the aggregator is negotiating per dataset as well. It is head and hand
+trajectories rather than full body, which makes it a source of realistic **input** traces for
+what an HMD actually delivers, and not a body corpus.
+
+Its constituents were checked one at a time, which is what a catalogue requires.
+
+**Who is Alyx** is `CC BY-NC-SA 4.0`, so non-commercial like nearly everything else. The paper
+around it is CC BY, being Frontiers open access, and the paper's licence does not reach the
+data. That distinction is worth keeping: an open access paper and its dataset are two
+different grants.
+
+The licence is not the important part of that entry.
+
+### Motion identifies the person who made it
+
+The dataset is 110 hours from 71 participants, and it is not only motion. It carries eye
+tracking with gaze and pupil position, screen recordings of what each player saw, demographics
+including age and sex and body parameters, and physiological data including blood volume
+pulse, heart rate, skin conductance and ECG.
+
+And its title is *"Who is Alyx? A new behavioral biometric dataset for **user identification**
+in XR"*.
+
+This logbook previously recorded, in the reasoning behind the two-signal video rule, that
+extracting joint angles is not a likeness because nobody can be identified from hip flexion.
+**That was wrong.** The paper's result is that head and hand motion identifies its author well
+enough to work as a biometric. The claim was reasoning, it was offered as reasoning rather
+than as fact, and a dataset found while looking for something else disproved it.
+
+The consequence is not only about this dataset. Motion recovered from video of a person is
+personal data about that person, so the GEM-X path over CC-BY video inherits a question the
+video licence cannot answer, because the uploader granted it and the person in frame did not.
+`video_admissible` already refused to return a bare yes there. It was right for a weaker
+reason than the real one.

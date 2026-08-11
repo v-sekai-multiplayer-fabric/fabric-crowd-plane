@@ -51,6 +51,12 @@ BLOCKED = {
         "surfaced in a Fab search under a locomotion keyword the same way a theatre chair "
         "surfaced under `sitting`, and it was briefly reported as a find. Blocking it keeps "
         "the next reader from repeating that.",
+    "whoisalyx": "Who is Alyx, CC BY-NC-SA 4.0, so non-commercial like the rest. The licence "
+        "is not the main reason to record it. It is 110 hours from 71 named participants of "
+        "motion, EYE TRACKING, SCREEN RECORDINGS, demographics including age and sex and body "
+        "parameters, and physiological data including heart rate and ECG. Its own paper is "
+        "titled 'a new behavioral biometric dataset for USER IDENTIFICATION in XR', which is "
+        "the finding that matters: XR motion identifies the person who made it.",
     "sam": "Meta SAM-3D-Body, under the custom SAM License. It carries no non-commercial "
            "clause, so it is not blocked for that. It is blocked because the licence is "
            "bespoke and not OSI approved, and it adds trade control and ITAR terms, a "
@@ -90,6 +96,15 @@ ALLOWED = {
            "listing carries `licenses[].name` and `isCc0`. Note the plural. `license=cc-by` "
            "is accepted and silently ignored, which returns the unfiltered catalogue looking "
            "like a filtered one. Downloads need an Epic account.",
+    "100style": "100STYLE, Ian Mason, CC BY 4.0 on two independent signals: the Zenodo "
+                "record and the dataset's own page, which says commercial work needs credit "
+                "as 'The 100STYLE Dataset - Ian Mason'. Four million frames, 100 styles, "
+                "with sidestep walk and run and idling, which are two of the measured gaps. "
+                "Attribution is a condition, so it is in ATTRIBUTION.md.",
+    "vr-balance": "Virtual Reality Balance Disturbance Dataset, CC BY 4.0, doi "
+                  "10.5281/zenodo.14013468. Falls and balance perturbation, which is the "
+                  "push gap and the thing that precedes getting up. Xsens MVN and labelled "
+                  "MATLAB, so it needs a reader before it is motion.",
     "quaternius": "Quaternius Universal Animation Library, CC0 1.0. Public domain, so there "
                   "is nothing to inherit and nothing to attribute. 120+ animations at 30 fps "
                   "on a retargetable humanoid rig, with root motion on all locomotion. Its "
@@ -105,9 +120,15 @@ ALLOWED = {
 # right, but it makes a careless tag much less likely to be the only evidence.
 #
 # The performer is a separate question from the recording. A licence on the video is granted
-# by whoever uploaded it, and the people in it did not sign it. Extracting joint angles is
-# not a likeness, but that is reasoning and not settled ground, so the check records what was
-# relied on rather than pretending the question was answered.
+# by whoever uploaded it, and the people in it did not sign it.
+#
+# An earlier version of this comment said that extracting joint angles is not a likeness,
+# because nobody can be identified from hip flexion. That was wrong, and the thing that shows
+# it is a dataset found while looking for corpora: "Who is Alyx? A new behavioral biometric
+# dataset for user identification in XR". Head and hand motion identifies the person who made
+# it well enough to be a biometric, and that is the paper's result rather than a worry about
+# one. Motion recovered from a video of a person is personal data about that person, and a
+# licence granted by an uploader does not speak for them.
 VIDEO_SIGNALS = ("license_field", "description")
 
 # A marketplace is not a source. Booth.pm is ten thousand authors who each wrote their own
@@ -117,6 +138,12 @@ VIDEO_SIGNALS = ("license_field", "description")
 # who explicitly permits it. Items from a marketplace are admissible only one at a time, by a
 # person who read that item's terms, and the reading gets recorded.
 PER_ITEM = {
+    "xr-motion-dataset-catalogue": "A catalogue, not a dataset. It aligns nine XR motion "
+        "datasets to one format and states no licence of its own, and one entry says "
+        "permissions are still pending, which shows the aggregator is negotiating them "
+        "per-dataset too. Each constituent carries its own DOI and terms. It is also head "
+        "and hand trajectories rather than full body, so it is a source of realistic INPUT "
+        "traces for what an HMD delivers, and not a body corpus.",
     "booth": "Booth.pm. Per-item author-written terms. Predominantly avatars and clothing "
              "rather than motion, so it is unlikely to be the answer to a corpus question "
              "even where an item permits use.",
