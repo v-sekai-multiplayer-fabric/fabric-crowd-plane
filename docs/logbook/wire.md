@@ -541,3 +541,25 @@ more than four indexed byte reads.
 
 So the edge is C++. Janet remains a good harness beside it, driving it from outside and
 faking clients, where it runs at the rate a person types.
+
+## Janet becomes a plane, and the cost stops being per packet
+
+The measurement above rules Janet out of the edge. It does not rule Janet out.
+
+A plane does not call another plane. It publishes and it subscribes, over a shared memory
+ring, and it reads when it chooses to. So the 117.8 ns crossing stops being a tax on every
+packet and becomes the cost of one sample:
+
+| where Janet sits | what it costs the packet path |
+| --- | --- |
+| inside the edge, called per packet | 117.8 ns against a 66.7 ns budget. **Fails.** |
+| inside the edge, called per connection | about nothing, but it shares a call stack and an address space |
+| **its own plane, on iceoryx2** | **nothing. The edge never calls it.** |
+
+The third row is the one worth having, and not only for the number. A separate plane cannot
+accidentally acquire a per-packet call, because there is no call to acquire. The boundary is
+a ring rather than a function, and a ring has a rate of its own.
+
+`fabric-janet-plane` holds the decision. The rule it must keep is one sentence: **it must
+never sit in the per-packet path**, which is a property the architecture now enforces rather
+than a comment somebody has to respect.
