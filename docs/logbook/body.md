@@ -211,3 +211,67 @@ at the root rather than a push from the legs, and it moves when the controller l
 
 The bodies are lying down while this happens. Resting pelvis height is 0.110 m, because
 nothing holds them up. A jump from a heap is still a jump, but it is not the picture.
+
+## The body was not a person, and somebody had already fixed that
+
+The body in `assets/tracked_avatar.xml` was written by hand from round numbers. Measured
+against real anatomy it is wrong in four ways at once, and the last two explain behaviour
+that had been blamed on the solver.
+
+**Segment lengths.** Against Anny's SOMA rest pose the legs are 8 to 9 per cent short and the
+arms 3 to 4 per cent short. Thigh 0.400 against 0.433, shin 0.390 against 0.424.
+
+**Segment masses.** MS-Human-700 gives a distribution: trunk 26.2 per cent, pelvis 13.9,
+thigh 10.4 each, shin 4.8, upper arm 3.2, forearm 1.85, hand 0.65. A first pass grouping by
+name reached only 73 per cent of body mass, because the trunk is 50 separate bodies whose
+names match no obvious pattern. Taking the trunk as the remainder is the only way to be sure
+nothing is dropped.
+
+**Joint ranges are wider than a person's.** Ankle 1.3 times, shoulder 1.3, elbow 1.2, and hip
+flexion has its sign convention inverted: the model allows -109 to 34 degrees where the
+anatomy is -30 to 115. Only the knee agrees, at 0 to 138.
+
+**Every joint carries the same 300 N m.** Against measured human maxima the neck is 10 times
+too strong, the elbow 5.5, the shoulder 3.8, the ankle 2.1, and the hip and knee 1.4.
+
+The last two together describe a body with superhuman arms that can also reach poses a person
+cannot. A controller on that frame will find a strategy that works and is not balance, which
+is what the PD servo did: it collapsed the crowd and then ejected it upward.
+
+### The prior art was already installed
+
+None of this is new. `protomotions/robot_configs/soma23.py` carries the same body under
+`BUILT_IN_PD` and splits it three ways:
+
+| group | effort limit |
+| --- | ---: |
+| Spine, Chest, Neck, Head | 300 |
+| Shoulder, Arm, Hand | **150** |
+| Leg, Shin, Foot, ToeBase | 300 |
+
+Arms at half of legs and trunk. Our flat 300 gives arms exactly twice what NVIDIA ships for
+the same skeleton. The direction argued from muscle anatomy and from the literature is the
+direction their config already takes, and theirs has trained working policies, which is
+better evidence than either.
+
+Their numbers and the literature disagree on how far to go. The literature puts the elbow at
+55 N m and the shoulder at 80, which is a ratio nearer four to one than two to one, and it
+puts the neck at 30 against their 300. Two to one is what is known to train, so that is the
+floor of the correction and not the whole of it.
+
+`bench/real_body.py` holds every number with the source it came from. Nothing in it is a
+tuning constant: each value is a measurement or a ratio of two measurements.
+
+### What MS-Human-700 is not for
+
+It is not the body. 700 muscles at a 2 ms timestep is 4182 microseconds a frame for ONE
+body, so about 4 to a core against roughly 200 for capsules. The Locomotion variant, at 100
+muscles and 36 degrees of freedom, is 966 microseconds and about 17 to a core, still twelve
+times worse. It is a reference for masses, ranges, and the relative pattern of strength.
+
+Its muscle sum is also not a torque limit. Summing every muscle at peak isometric force over
+its moment arm counts antagonists that in reality oppose each other, and lands 1.5 to 4 times
+above measured human maxima: hip 755 against about 210, ankle 583 against about 140. A first
+pass also reported a knee ceiling of 20936, which came from summing the model's knee slide
+degrees of freedom, whose moment arms are newtons and not newton metres. Thirteen of its 85
+degrees of freedom are translations and must be excluded.
