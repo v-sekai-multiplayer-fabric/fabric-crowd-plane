@@ -190,3 +190,24 @@ Jolt is faster by about a third to a half on the worst frame, not by the order o
 the first run suggested. That first run measured a benchmark whose push never stopped, so it
 was timing an explosion. The MuJoCo row at 100 coming in under the row at 80 is measurement
 noise and a reminder that these are worst-frame numbers from a single fifteen second run.
+
+## Jump was the same fault as walk, and outlived the fix
+
+`JUMP` put 6000 N on the pelvis for every frame the key was down. The pelvis alone is
+12.23 kg, so that is 490 m/s^2, and holding the key held the force. Traced frame by frame it
+does not jump: it passes 5 m and is still climbing at 6.8 m/s. This is the constant-force
+fault the walk drive had, left behind because the walk was fixed by hand and the jump beside
+it was not read.
+
+A jump is an impulse with a height. `JUMP_HEIGHT` is 0.5 m, a standing human jump, and the
+takeoff speed that reaches it is sqrt(2*g*h) = 3.13 m/s. It is applied once, on the press,
+and only when some part of the body touches something that is not itself. Holding the key
+for ten seconds now leaves the pelvis 78 mm above rest with no vertical speed.
+
+The height that comes out is 0.36 m and not the 0.50 m asked for. Takeoff loses 18 per cent
+of the speed to the ground contact it is pushing against, and the rise from what survives is
+2.555^2/2g = 0.333 m, which is what the trace shows. That is honest for a velocity injected
+at the root rather than a push from the legs, and it moves when the controller lands.
+
+The bodies are lying down while this happens. Resting pelvis height is 0.110 m, because
+nothing holds them up. A jump from a heap is still a jump, but it is not the picture.

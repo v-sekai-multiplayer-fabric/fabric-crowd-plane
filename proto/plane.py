@@ -45,7 +45,12 @@ RUN_SPEED = float(os.environ.get("RUN_SPEED", "5.0"))
 # then ejected upward, which reads as standing if a height is sampled at one instant. A PD
 # hold has no term for where the centre of mass is over the feet, so it cannot balance. The
 # motors wait on the trained controller, which does have that term. See docs/logbook/controller.md.
-JUMP = float(os.environ.get("JUMP", "6000"))
+# How high a body jumps, in metres. A standing human jump clears about half a metre, and
+# the takeoff speed that reaches it is sqrt(2*g*h). That is the whole of the jump: one
+# impulse at takeoff, then gravity. An earlier version held 6000 N for as long as the key
+# was down, which is 490 m/s^2 on the pelvis and rises without limit. It reached 5 m and was
+# still climbing. A held force is not a jump for the same reason it was not a walk.
+JUMP_HEIGHT = float(os.environ.get("JUMP_HEIGHT", "0.5"))
 CROUCH = float(os.environ.get("CROUCH", "2500"))
 FACE_TORQUE = float(os.environ.get("FACE_TORQUE", "400"))
 PORT = int(os.environ.get("PORT", "8770"))
@@ -92,6 +97,15 @@ class Room:
         self._jhi = np.array([r[1] for r in self.jrange])
         self.free = set(range(n))
         self.owner = {}
+        self.jumping = set()          # who is holding the key, so a jump fires once
+        # The speed that reaches JUMP_HEIGHT under this model's own gravity.
+        self.takeoff = float(np.sqrt(2.0 * abs(self.m.opt.gravity[2]) * JUMP_HEIGHT))
+        # Which geoms belong to which person, for the contact test.
+        self.geom_owner = np.full(self.m.ngeom, -1, dtype=int)
+        per = (self.m.ngeom - 1) // n
+        for g in range(self.m.ngeom):
+            if self.m.geom_bodyid[g] != 0:
+                self.geom_owner[g] = (g - 1) // per
         # Where each actuator reads its own angle and rate. The controller will need these.
         trn = self.m.actuator_trnid[:, 0]
         self.act_qpos = self.m.jnt_qposadr[trn]
@@ -99,6 +113,15 @@ class Room:
         self.pose = self.d.qpos[self.act_qpos].copy()
         for _ in range(40):
             mujoco.mj_step(self.m, self.d)
+
+    def grounded(self, i):
+        """True when this person touches something that is not another part of themselves."""
+        for c in range(self.d.ncon):
+            g1, g2 = self.d.contact.geom1[c], self.d.contact.geom2[c]
+            o1, o2 = self.geom_owner[g1], self.geom_owner[g2]
+            if (o1 == i) != (o2 == i):
+                return True
+        return False
 
     def claim(self, cid):
         if not self.free:
@@ -144,8 +167,14 @@ class Room:
                 if over > PUSH:
                     need *= PUSH / over
                 self.d.xfrc_applied[r, 0:2] = need
+            # A jump fires once, on the press, and only with the feet on something. Holding
+            # the key does not keep pushing, so there is no way to hold a body into the sky.
             if cmd.get("jump"):
-                self.d.xfrc_applied[r, 2] = JUMP
+                if i not in self.jumping and self.grounded(i):
+                    self.d.qvel[self.m.body_dofadr[r] + 2] += self.takeoff
+                self.jumping.add(i)
+            else:
+                self.jumping.discard(i)
             if cmd.get("crouch"):
                 self.d.xfrc_applied[r, 2] = -CROUCH
             fx, fy = cmd.get("face", (0.0, 0.0))
