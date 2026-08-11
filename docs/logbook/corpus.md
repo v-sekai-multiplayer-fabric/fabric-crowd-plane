@@ -166,3 +166,43 @@ survive in the Xform tree above it, `root_01`, `pelvis_02`, `spine_01_03`, and t
 to be recovered by matching the topology to the published UE4 mannequin hierarchy. That is
 deterministic and it is work, and it is not done. Kimodo emits SOMA names already, which is
 the cheaper 97 per cent of this gap.
+
+## Foot contacts, derived and then checked against a model that knows
+
+Motion matching uses foot contact as a matching feature and a physics tracker uses it to know
+when a foot may carry load. Kimodo emits contacts. The O3DE clips, 100STYLE, and the Fab USDZ
+do not, so the corpus disagrees about whether the information exists.
+
+`bench/foot_contacts.py` derives them with NVIDIA's own heuristic from
+`kimodo/motion_rep/feet.py`, Apache-2.0: a foot is in contact when it is low and slow. Their
+call passes 0.15 and 0.10. Two bare numbers is what this repo does not keep, so both are
+derived instead. The height threshold is the skeleton's own lowest foot position plus a tenth
+of that skeleton's standing height, so a short body and a tall one get different thresholds.
+The speed threshold is a quarter of the median joint speed in that clip, so a clip of standing
+and a clip of sprinting are each judged on their own terms.
+
+The derivation is not trusted, it is measured, because Kimodo's clips carry contacts the model
+itself produced:
+
+| clip | agreement | model | derived |
+| --- | ---: | ---: | ---: |
+| sit_stand2 | 99.6% | 0.71 | 0.70 |
+| idle_stand | 89.3% | 1.00 | 0.89 |
+| get_up | 73.6% | 0.72 | 0.51 |
+
+It reproduces the model almost exactly for locomotion and standing, and falls to three
+quarters on a floor transition, which is where the question is genuinely ambiguous: during a
+get-up the hands and knees carry load and "is the foot in contact" stops being the right
+question. The number to distrust is the one on the behaviour we have least of.
+
+### Conditioning on contacts needs no retraining
+
+`foot_contacts` is a channel of `KimodoMotionRep`, four values beside root position, joint
+positions, rotations, and velocities. The denoiser takes `motion_mask` and `observed_motion`,
+which mark which channels are known and supply them. Masking the four contact channels and
+supplying a pattern is therefore contact conditioning, using machinery that already exists.
+
+The documentation says contacts are "trained to support this, but not currently implemented
+in the demo UI or Python API". That is true of the UI and the public API and not of the model,
+which is a useful distinction to have found before writing a training loop to add a feature
+that is already there.

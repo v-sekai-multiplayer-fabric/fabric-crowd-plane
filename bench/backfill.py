@@ -28,6 +28,18 @@ MOVING = 1.0 - SHARE["idle"]
 TURNING_CLIPS_S = 85.8 + 95.8 + 47.0 + 70.3 + 62.9 + 52.9 + 35.8   # the seven, measured
 
 
+# What the two Zenodo corpora are expected to add, once they land. These are PROJECTIONS
+# from each dataset's own description, not measurements, and they are marked so. 100STYLE
+# states it captures, for each of 100 styles: forward walk and run, backward walk and run,
+# sidestep walk and run, idling, and the transitions between them. Four million frames at
+# 60 Hz is about 18.5 hours, and even a tenth of it landing on idling is far past the gap.
+INCOMING = {
+    "standing still": ("100STYLE idling", 4_000_000 / 60 * 0.10),
+    "strafing":       ("100STYLE sidestep walk and run", 4_000_000 / 60 * 0.15),
+    "being pushed":   ("VR Balance perturbation and falls", 900.0),
+}
+
+
 def covered():
     """Seconds the corpus already spends on each behaviour we need."""
     return {
@@ -46,13 +58,21 @@ def main():
     print("  the seven O3DE turning clips, its weakest behaviour that still works\n")
 
     have = covered()
-    print("%-16s %10s %10s %10s" % ("behaviour", "have", "target", "missing"))
-    total = 0.0
+    print("%-16s %8s %8s %8s   %s" % ("behaviour", "have", "target", "missing", "incoming"))
+    total = still = 0.0
     for k, v in have.items():
         miss = max(unit - v, 0.0)
         total += miss
-        print("%-16s %8.0f s %8.0f s %8.0f s" % (k, v, unit, miss))
-    print("%-16s %10s %10s %8.0f s = %.0f min" % ("", "", "", total, total / 60))
+        src, add = INCOMING.get(k, ("", 0.0))
+        after = max(unit - v - add, 0.0)
+        still += after
+        note = "%s, %.0f s projected" % (src, add) if src else "nothing queued covers it"
+        print("%-16s %6.0f s %6.0f s %6.0f s   %s" % (k, v, unit, miss, note))
+    print()
+    print("  missing before the queue lands   %6.0f s = %.0f min" % (total, total / 60))
+    print("  missing after, if the projections hold  %5.0f s = %.0f min" % (still, still / 60))
+    print("  the projections are read off dataset descriptions and are not measured yet")
+    total = still
 
     print("\ncost to generate it")
     # measured: 240 frames took about 2 s on the 4090, plus a model load per invocation
