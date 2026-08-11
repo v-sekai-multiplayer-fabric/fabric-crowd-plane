@@ -417,3 +417,47 @@ Episode reward was still climbing at the end, 106.6 at the midpoint and 128.9 at
 so 500 iterations stopped the run rather than finished it. That makes H3 the next test, and it
 is now a different question from the one first written: not "does more training rescue a dead
 run", but "how far does a run that is already learning go".
+
+## Which motion may train the controller
+
+Mixamo is blocked. Its terms cover using the animations inside a project, and a trained
+policy carries the corpus in its weights and is redistributed, which is not the same thing.
+`bench/corpus.py` holds the rule and `bench/test_corpus.py` fails if it is broken. Unknown
+provenance is refused by default, because silence is not consent.
+
+Two corpora were measured against what a gamepad controller needs.
+
+**AddBiomechanics, 130 files, 68 GB.** 125 readable, 4380 trials, 7.7 hours at 250 Hz. Five
+files are zero bytes and did not transfer. It is the wrong corpus for control, and the
+reason is not size:
+
+- Every trial is treadmill-pinned. The root travels 0.04 to 0.38 m during six seconds of
+  running, so root velocity is near zero whatever the subject is doing. The speed a stick
+  would command is the belt speed, and the belt speed is not recorded.
+- There is no turning at all. A treadmill runs in a straight line.
+- Standing is 0.8 per cent, about 3.5 minutes.
+
+Recovering belt speed from the centre of pressure was tried and does not work. It returns
+1.00 m/s for a trial named fast and 1.08 for one named slow, inverted and far too low,
+because the centre of pressure tracks heel-to-toe roll-over under a planted foot rather than
+the belt. Roughly a quarter of a metre per stance whatever the speed.
+
+What AddBiomechanics does have is gait with measured ground reaction forces, which is rare.
+That is a later corpus for a different question.
+
+**O3DE motion matching, 22 clips, 28 minutes.** Apache-2.0 or MIT at the reader's option,
+confirmed from the repository's own `LICENSE.txt`. It arrives through
+`godot-motion-matching-demo`, which credits it.
+
+- Root motion is real. Extents run 6.8 to 26 m.
+- `TurnOnSpot1` has an extent of 0.97 m against about 10 m for everything else. The corpus
+  states what it contains and then measures out as containing it.
+- The clips are the command vocabulary: a speed ladder, seven turning clips, starts and
+  stops, and one clip each for jump, crouch, and push, which are the three commands the
+  plane already takes.
+
+At 30 Hz this is about 50000 frames, four times the mini set the three local runs used.
+
+The skeleton is Godot's `GeneralSkeleton`, so 22 of the 23 SOMA bodies map by name or by an
+obvious rename. Only `Neck2` has no source, because VRM carries one neck bone where SOMA
+carries two. Anny supplies the SOMA rest pose that the split needs.
