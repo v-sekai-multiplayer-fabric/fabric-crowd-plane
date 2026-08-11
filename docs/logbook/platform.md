@@ -500,7 +500,7 @@ They are artefacts and are not committed.
 | app | what it is | state |
 | --- | --- | --- |
 | `weft-plane` | the native C++ plane. No networking, as a plane should have none. | 60.0 Hz, worst frame 11.2 ms of 16.7 |
-| `weft-room` | the Python plane with a WebSocket, which the viewer needs | running |
+| ~~`weft-room`~~ | **deleted.** A WebSocket is HTTP/1.1, which is not the client transport. |
 | ~~`weft-view`~~ | **deleted.** The viewer runs on the player's machine. See below. |
 
 Hosting the viewer is a demo convenience and not the architecture. **The browser is still the
@@ -575,3 +575,34 @@ person watching, and it reaches `weft-room` over the same WebSocket the hosted c
 
 What remains on Fly is `weft-plane`, which is the native C++ plane, and `weft-room`, which is
 the plane with the WebSocket. Two apps, and neither of them renders anything.
+
+## The room is deleted, and it was never a plane
+
+`weft-room` is destroyed, and so is `weft-crowd-bench`. `weft-plane` is the only app left.
+
+The room held the WebSocket the viewer needed, and that is the whole reason it existed. It
+broke three rules at once, and the table above stated one of them in its own description:
+
+- **A WebSocket is an HTTP/1.1 Upgrade.** The client transport is HTTP/3 and WebTransport,
+  and `CLAUDE.md` says never HTTP/1.1.
+- **It was Python.** Native code here is C++.
+- **It had networking and called itself a plane.** A plane has no networking, and an edge is
+  a plane with networking. That is a definition, so there was no exception to check.
+
+It was scaffolding that justified itself: the viewer needed something to talk to, so a server
+appeared, and then it read as part of the architecture because it was in the table.
+
+### There is now no client transport, on purpose
+
+`weft-plane` is a plane and correctly has none. So nothing serves a browser until
+`fabric-edge` exists, and that gap is recorded here rather than papered over by a protocol
+that was never allowed.
+
+`fabric-edge` terminates HTTP/3 and WebTransport with **picoquic** and hands the decoded
+result to a plane over **iceoryx2**. picoquic is C, which is the arrangement iceoryx2 already
+has: a dependency rather than weft code, called through its C ABI, listed in a `sigs` file so
+the edge builds on a machine that has never seen it and fails at start with a named symbol.
+
+An edge obeys every plane rule and adds one capability. It holds no authority, runs no
+simulation, and keeps no durable state, so it is the one place with a listening socket and
+the one place with nothing worth stealing.
