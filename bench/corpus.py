@@ -97,6 +97,36 @@ ALLOWED = {
 # relied on rather than pretending the question was answered.
 VIDEO_SIGNALS = ("license_field", "description")
 
+# A marketplace is not a source. Booth.pm is ten thousand authors who each wrote their own
+# terms, usually in Japanese, usually forbidding redistribution. There is no blanket licence
+# to check and so no entry in either dict above can be right: a rule that blanket-allowed it
+# would admit items that forbid this, and one that blanket-blocked it would refuse an author
+# who explicitly permits it. Items from a marketplace are admissible only one at a time, by a
+# person who read that item's terms, and the reading gets recorded.
+PER_ITEM = {
+    "booth": "Booth.pm. Per-item author-written terms. Predominantly avatars and clothing "
+             "rather than motion, so it is unlikely to be the answer to a corpus question "
+             "even where an item permits use.",
+}
+
+
+def per_item_admissible(source, item_id, terms_read_by, permits_training, permits_redistribution):
+    """Admit one marketplace item, and record who read the terms.
+
+    `terms_read_by` is a person. There is no default and no automatic pass, because the
+    thing being checked is whether somebody actually read it.
+    """
+    if source not in PER_ITEM:
+        return ("error", "%s is not a per-item source; use admissible()" % source)
+    if not terms_read_by:
+        return ("error", "nobody is recorded as having read the terms for %s/%s" % (source, item_id))
+    if not permits_training:
+        return ("error", "%s/%s does not permit training" % (source, item_id))
+    if not permits_redistribution:
+        return ("error", "%s/%s forbids redistribution, and a shipped policy carries its "
+                         "corpus in the weights" % (source, item_id))
+    return ("ok", {"source": source, "item": item_id, "read_by": terms_read_by})
+
 
 def video_admissible(signals):
     """`signals` is what was actually observed, e.g. {"license_field": "cc-by", ...}."""

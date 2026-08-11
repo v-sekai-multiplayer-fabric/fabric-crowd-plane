@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from corpus import (admissible, classify, filter_corpus, roots, ROOT, BLOCKED, ALLOWED,
-                    video_admissible)
+                    video_admissible, per_item_admissible)
 
 
 def test_mixamo_is_refused():
@@ -130,6 +130,19 @@ def test_a_video_licence_does_not_speak_for_the_performer():
     tag, val = video_admissible({"license_field": "cc-by", "description": "cc-by"})
     assert tag == "ok"
     assert "performer" in " ".join(val)
+
+
+def test_a_marketplace_item_needs_a_person():
+    """No blanket answer is right for a marketplace, so each item is admitted by a reader."""
+    ok = per_item_admissible("booth", "1234", "ernest", True, True)
+    assert ok[0] == "ok" and ok[1]["read_by"] == "ernest"
+    # nobody read it
+    assert per_item_admissible("booth", "1234", "", True, True)[0] == "error"
+    # read, and the terms say no
+    assert per_item_admissible("booth", "1234", "ernest", False, True)[0] == "error"
+    assert per_item_admissible("booth", "1234", "ernest", True, False)[0] == "error"
+    # not a marketplace
+    assert per_item_admissible("o3de", "1", "ernest", True, True)[0] == "error"
 
 
 def test_unknown_provenance_is_refused():

@@ -27,7 +27,9 @@ holds the measurements. `../../PLAN.md` says what is being built.
 | `crowd.md` | bodies that touch each other, and the stance controller that does not work yet |
 | `controller.md` | what the controller must do, its inputs, and the body it drives |
 | `training.md` | each training run, the hypothesis it tested, and what came back |
-| `corpus.md` | which motion may train a policy weft ships, and what each corpus really holds |
+| `corpus.md` | what each corpus actually holds, how much is missing, and how it is generated |
+| `licensing.md` | whether a corpus may be used at all, and why a permissive badge is not enough |
+| `anatomy.md` | what the body is: lengths, masses, joint ranges, and the motors derived for it |
 | `inference.md` | what running the policy costs, and how to make it console-fast |
 
 ## Open predictions
