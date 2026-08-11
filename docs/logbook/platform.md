@@ -606,3 +606,26 @@ the edge builds on a machine that has never seen it and fails at start with a na
 An edge obeys every plane rule and adds one capability. It holds no authority, runs no
 simulation, and keeps no durable state, so it is the one place with a listening socket and
 the one place with nothing worth stealing.
+
+## The plane is stopped, and redeploying it was the wrong item
+
+`weft-plane` ran for eleven and a half hours on a `shared-cpu-1x:1024MB` machine with nothing
+able to reach it. The viewer, the room and the bench are deleted, and no edge exists yet, so
+the plane had no client and no path to one.
+
+"Redeploy the plane" sat on the open list for that whole time and it was never the right task.
+A plane has no networking, so deploying a newer one changes nothing a person can see. The
+question a stale deployment asks is whether it should be running at all, and the answer here
+was no.
+
+**Machine 48e0e35bd24068 is stopped.** The app and its configuration stay, so the plane comes
+back when there is an edge to feed it, and it bills nothing in the meantime.
+
+That is the shape of the whole deployment right now. `weft-view` is destroyed, `weft-room` is
+destroyed because a WebSocket was never the client transport, `weft-crowd-bench` is destroyed,
+and the one remaining app is stopped. **Nothing is running, and that is correct**: a plane with
+no edge serves nobody, and paying for it would only hide that the transport is missing.
+
+The next deploy is not this plane. It is `fabric-ingest-edge` or `fabric-gateway-edge`,
+whichever terminates a transport first, and this plane starts again beside it in the same
+domain.
