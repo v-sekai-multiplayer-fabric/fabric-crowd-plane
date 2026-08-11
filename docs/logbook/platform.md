@@ -629,3 +629,28 @@ no edge serves nobody, and paying for it would only hide that the transport is m
 The next deploy is not this plane. It is `fabric-ingest-edge` or `fabric-gateway-edge`,
 whichever terminates a transport first, and this plane starts again beside it in the same
 domain.
+
+## Nothing is deployed
+
+`weft-plane` is destroyed. **No apps remain**, no machines, no volumes, no addresses. The
+hosting bill is zero.
+
+The four apps went for four different reasons, and only one of them was about cost:
+
+| app | why it went |
+| --- | --- |
+| `weft-view` | it hosted a Viser scene, and the browser is the renderer. Hosting the viewer was a demo convenience that had started to read as architecture. |
+| `weft-room` | a WebSocket is an HTTP/1.1 upgrade, and the client transport is HTTP/3 and WebTransport. It was a Python server calling itself a plane. |
+| `weft-crowd-bench` | the measurement it existed for is in this logbook. |
+| `weft-plane` | correct, and unreachable. A plane has no networking, and there is no edge yet. |
+
+**Nothing is running and that is the honest state**, not a retreat. Every one of those apps
+was serving a path that the architecture had already ruled out, and the one that was correct
+had nothing to talk to. Paying to keep them would have hidden that the client transport does
+not exist.
+
+Redeploying is one command. `fly.plane.toml` and `deploy/Dockerfile.plane` are in this
+repository, so the plane returns with `flyctl deploy -c fly.plane.toml` whenever there is an
+edge to feed it.
+
+The next deploy is an edge, and the plane goes back beside it in the same domain.
