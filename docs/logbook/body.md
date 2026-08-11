@@ -275,3 +275,47 @@ above measured human maxima: hip 755 against about 210, ankle 583 against about 
 pass also reported a knee ceiling of 20936, which came from summing the model's knee slide
 degrees of freedom, whose moment arms are newtons and not newton metres. Thirteen of its 85
 degrees of freedom are translations and must be excluded.
+
+## Recovering the motors for a body that was sampled, not built
+
+Anny samples a shape: height, mass, proportions, muscularity. It does not sample actuators,
+and a 1.5 m 48 kg body cannot be driven by numbers that fit a 1.9 m 95 kg one. The torque
+limits, the armature, and the gains all have to move with the body or the controller is
+driving something that is not there.
+
+None of it is fitted. Each follows from dimensional analysis anchored on the one body whose
+numbers were measured.
+
+**Torque follows mass.** Muscle force follows physiological cross-sectional area and the
+torque follows that force times a moment arm. Isometrically, area goes as L^2 and the arm as
+L, so torque goes as L^3, and mass goes as L^3 as well. Torque per kilogram is therefore
+constant, which is why the literature reports it that way. It survives non-isometric scaling
+too: hold height and vary mass, and area goes as m/L while the arm still goes as L, so torque
+goes as m again.
+
+**Muscularity modulates it at fixed mass**, because two bodies of equal mass do not have equal
+cross-section. It multiplies torque and nothing else.
+
+**Inertia follows m L^2**, so armature does, and so do the gains. `body.md` above records the
+bound kp < 4I/dt^2, so kp follows inertia, and critical damping puts kd at 2*sqrt(kp*I),
+which follows inertia too. `kp` is set at 0.6 of its own ceiling, which is a ratio to a
+derived bound and not a number chosen to feel right.
+
+`bench/motors.py` holds it. The reference body reproduces the measured torques exactly, which
+is the check that the scaling has not quietly moved the anchor.
+
+| body | hip | knee | elbow | armature | kp |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 48 kg 1.52 m, light build | 122 | 126 | 32 | 0.0110 | 95 |
+| 55 kg 1.55 m, muscular | 206 | 213 | 54 | 0.0131 | 113 |
+| 70 kg 1.70 m, reference | 210 | 217 | 55 | 0.0200 | 173 |
+| 78 kg 1.88 m, light build | 199 | 206 | 52 | 0.0273 | 235 |
+| 95 kg 1.90 m, heavy | 328 | 339 | 86 | 0.0339 | 293 |
+
+Hip torque spans a factor of 2.7 and armature a factor of 3.1 across the range Anny samples.
+A single set of motors is wrong at both ends by about that much, which is the quantity the
+flat 300 N m was hiding.
+
+The second row is the one worth reading twice. A 55 kg muscular body lands within two per
+cent of the 70 kg reference at the hip, because muscularity makes up what mass does not. Pure
+mass scaling would have made it 40 per cent weaker and wrong.

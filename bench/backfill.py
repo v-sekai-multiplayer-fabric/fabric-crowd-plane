@@ -84,6 +84,26 @@ def main():
     print("  The population sampled from must be written down. A distribution nobody states is")
     print("  a default nobody chose.")
 
+    print("\nthe cross product, which costs no new motion")
+    print("  The O3DE clips are motion we already have and whose provenance is clean. Anny")
+    print("  samples bodies. `motors.py` recovers actuators for each. Running one clip through")
+    print("  physics on one body is a different trajectory from running it on another, because")
+    print("  a 48 kg body cannot take a 95 kg body's step and the contact forces differ.")
+    print()
+    strata = 5
+    o3de_h = O3DE_SECONDS / 3600
+    print("  %d clips x %d strata = %.2f h of physically grounded motion, from %0.2f h owned"
+          % (22, strata, o3de_h * strata, o3de_h))
+    print("  plus the backfill across the same strata      %.2f h" % (total * strata / 3600))
+    print("  total                                         %.2f h"
+          % ((O3DE_SECONDS + total) * strata / 3600))
+    print()
+    print("  This is not the same clip five times. The reference is kinematic and the result")
+    print("  is what that body actually does under its own motors, including where it fails to")
+    print("  track. A short body given a tall body's stride will not reach, and that is the")
+    print("  signal, not a defect: it is the tracker learning what this body can do.")
+    print("  What it does not fix is that the reference gait is still one person's.")
+
     print("\nfor scale")
     print("  usable on disk now      %6.2f h" % ((O3DE_SECONDS + KIMODO_SECONDS) / 3600))
     print("  after backfill          %6.2f h" % ((O3DE_SECONDS + KIMODO_SECONDS + total) / 3600))
