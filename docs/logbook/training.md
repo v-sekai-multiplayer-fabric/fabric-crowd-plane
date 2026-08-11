@@ -167,3 +167,176 @@ Episode reward was still climbing at the end, 106.6 at the midpoint and 128.9 at
 so 500 iterations stopped the run rather than finished it. That makes H3 the next test, and it
 is now a different question from the one first written: not "does more training rescue a dead
 run", but "how far does a run that is already learning go".
+
+## RESULT: H2 works, and the criterion written for it was the wrong one
+
+Same 500 iterations, same motion set, discriminator learning rate 1e-4 to 1e-5 and gradient
+penalty 5.0 to 10.0. End-of-run values:
+
+| series | baseline | H2 | |
+| --- | --- | --- | --- |
+| `info/episode_reward` | 30.6 | **128.9** | 4.2 times |
+| `env/total_env_reward_mean` | 0.415 | **0.463** | first movement in this series at all |
+| `rewards/unnormalized_amp_rewards` | 0.133 | 0.183 | stopped collapsing |
+| `discriminator/agent_acc` | 0.947 | 0.892 | slightly less certain |
+| `discriminator/pos_acc` | 1.000 | **0.999** | did not move |
+
+The prediction was that `pos_acc` would fall into the 0.7 to 0.9 band, and it did not. By the
+criterion written down in advance, H2 fails.
+
+By outcome it plainly works. Episode reward went up 4.2 times and the task reward moved for
+the first time across two runs. So the hypothesis was right and **the proxy chosen to test it
+was wrong**: a discriminator can still classify expert motion perfectly while leaving the
+policy a usable gradient, because what matters is the slope it presents, not the accuracy it
+reaches. `unnormalized_amp_rewards` turning from falling to rising was the honest indicator
+and it was in the table all along, one row down.
+
+Worth keeping because the next hypothesis will need a criterion too, and the lesson is to pick
+the one nearest the outcome rather than the one nearest the mechanism.
+
+### What it does not settle
+
+Episode reward was still climbing at the end, 106.6 at the midpoint and 128.9 at the finish,
+so 500 iterations stopped the run rather than finished it. That makes H3 the next test, and it
+is now a different question from the one first written: not "does more training rescue a dead
+run", but "how far does a run that is already learning go".
+
+## Which motion may train the controller
+
+Mixamo is blocked. Its terms cover using the animations inside a project, and a trained
+policy carries the corpus in its weights and is redistributed, which is not the same thing.
+`bench/corpus.py` holds the rule and `bench/test_corpus.py` fails if it is broken. Unknown
+provenance is refused by default, because silence is not consent.
+
+Two corpora were measured against what a gamepad controller needs.
+
+**AddBiomechanics, 130 files, 68 GB.** 125 readable, 4380 trials, 7.7 hours at 250 Hz. Five
+files are zero bytes and did not transfer. It is the wrong corpus for control, and the
+reason is not size:
+
+- Every trial is treadmill-pinned. The root travels 0.04 to 0.38 m during six seconds of
+  running, so root velocity is near zero whatever the subject is doing. The speed a stick
+  would command is the belt speed, and the belt speed is not recorded.
+- There is no turning at all. A treadmill runs in a straight line.
+- Standing is 0.8 per cent, about 3.5 minutes.
+
+Recovering belt speed from the centre of pressure was tried and does not work. It returns
+1.00 m/s for a trial named fast and 1.08 for one named slow, inverted and far too low,
+because the centre of pressure tracks heel-to-toe roll-over under a planted foot rather than
+the belt. Roughly a quarter of a metre per stance whatever the speed.
+
+What AddBiomechanics does have is gait with measured ground reaction forces, which is rare.
+That is a later corpus for a different question.
+
+**O3DE motion matching, 22 clips, 28 minutes.** Apache-2.0 or MIT at the reader's option,
+confirmed from the repository's own `LICENSE.txt`. It arrives through
+`godot-motion-matching-demo`, which credits it.
+
+- Root motion is real. Extents run 6.8 to 26 m.
+- `TurnOnSpot1` has an extent of 0.97 m against about 10 m for everything else. The corpus
+  states what it contains and then measures out as containing it.
+- The clips are the command vocabulary: a speed ladder, seven turning clips, starts and
+  stops, and one clip each for jump, crouch, and push, which are the three commands the
+  plane already takes.
+
+At 30 Hz this is about 50000 frames, four times the mini set the three local runs used.
+
+The skeleton is Godot's `GeneralSkeleton`, so 22 of the 23 SOMA bodies map by name or by an
+obvious rename. Only `Neck2` has no source, because VRM carries one neck bone where SOMA
+carries two. Anny supplies the SOMA rest pose that the split needs.
+
+## Generating the missing behaviours, and six ways it lies quietly
+
+Neither corpus holds standing, sitting, getting off the floor, or being jostled. Kimodo, an
+NVIDIA kinematic motion diffusion model, generates them and emits `somaskel77` directly, which
+is the target skeleton, so these clips need no retarget at all. It also ships foot contacts,
+which the O3DE clips do not have.
+
+Six things in this path produce a file that loads, passes every numeric check, and is wrong.
+They are written down because none of them announces itself.
+
+**1. A prompt separated by commas is one segment.** Kimodo splits a prompt on full stops and
+gives each piece its own span. `walks to a chair, sits down, waits, then stands up` is a single
+twelve second segment, and the model follows the first clause and abandons the rest. The clip
+sat down, fell to the floor, and stayed there for the last four seconds. Written as four
+sentences with `--duration "3 3 3 3"` the same request produces walk, sit, stand, walk away.
+
+**2. A number cannot tell whether the motion is the motion that was asked for.** The bad clip
+passed everything: 1.80 m tall, 1.70 m travelled, root error zero, units correct, no NaN. Two
+of the first four clips were wrong and every check was green on both. Drawing eight frames to a
+contact sheet and looking at it took seconds and showed both failures at once. A second clip
+prompted for a shove stood almost still for eight seconds. `render_motion.py` exists for this.
+
+**3. `somaskel77` is a ROOT node plus 77 joints.** The shipped T-pose BVH holds 78. The model
+emits the 77, so the ROOT is dropped and the rest reparented.
+
+**4. The skeleton is centimetres and the motion is metres, in the same model.** The BVH offsets
+put the hips 100 units up; the generated motion puts them at 1.002. One is divided and the
+other is not. Anny's SOMA rig is centimetres too, and read as metres it describes a skeleton
+154 m tall.
+
+**5. USD holds a translation in the last row, numpy in the last column.** A matrix handed
+across without a transpose writes a file that opens and animates and is wrong. Both converters
+read their own output back and compare against the source.
+
+**6. `Gf` constructors take Python floats.** A numpy scalar matches no overload and raises from
+inside Boost.Python with a message naming only C++ signatures.
+
+USD is the intermediate rather than BVH or FBX. BVH states neither unit nor axis, so every
+reader guesses, which is how faults 3 and 4 stay hidden. FBX needs a vendor SDK. A `UsdSkel`
+file carries `metersPerUnit`, the up axis, the rest pose, and the animation in one readable
+place, and foot contacts ride along as `weft:footContacts`.
+
+### The text encoder is gated, and the way around it has a trap
+
+Kimodo encodes text with LLM2Vec over Llama-3-8B-Instruct, which Meta gates by hand. The
+weights are mirrored ungated at `NousResearch/Meta-Llama-3-8B-Instruct` and the LLM2Vec
+adapters are open, so the encoder is assembled from both.
+
+`prepare_for_tokenization` applies the Llama-3 chat template only when `config._name_or_path`
+is exactly `meta-llama/Meta-Llama-3-8B-Instruct`. So McGill's config is kept verbatim and only
+the weight files come from the mirror. Renaming it to the mirror still runs, and silently
+changes every embedding the model is conditioned on.
+
+### What is generated is kinematic
+
+These clips are poses, not forces. Nothing here actuates anything. A motion tracker is what
+turns a kinematic reference into a policy driving the 66 SOMA degrees of freedom as PD
+targets, which the SOMA model card calls the PD-control contract. The corpus is the reference
+for that training and is not itself a controller.
+
+## RESULT: H3 finished, and six times the training bought fifteen percent
+
+3000 iterations with H2's settings, against H2's 500.
+
+| series | baseline | H2, 500 iters | H3, 3000 iters |
+| --- | --- | --- | --- |
+| `env/total_env_reward_mean` | 0.42 | 0.46 | **0.53** |
+| `info/episode_reward` | 30.6 | **128.9** | 107.9 |
+| `rewards/unnormalized_amp_rewards` | 0.13 | 0.18 | **0.10** |
+| `discriminator/pos_acc` | 1.00 | 1.00 | 1.00 |
+
+Six times the training moved the task reward 15 percent and made the episode reward **worse**
+than the 500-iteration run. The AMP reward, which H2 had rescued from collapse, collapsed
+again over the longer run: 0.18 down to 0.10.
+
+The hypothesis asked "how far does a run that is already learning go". The answer is: not far,
+and then backwards. Weakening the discriminator bought a window in which the policy could
+learn, and 3000 iterations was long enough for the discriminator to win again anyway.
+
+### Which promotes H1
+
+Three runs now, and the AMP reward falls in all of them. H2 delayed it. H3 shows the delay is
+temporary. That is what a policy looks like when it cannot imitate its reference data, and the
+reference data is `soma23_bones_seed_mini`, a subset shipped to smoke-test a motion tracker.
+
+**H1 is now the live hypothesis rather than the last one.** Kimodo generates locomotion from
+text in the SOMA skeleton with a converter already written, so testing it costs a motion set
+rather than a retargeting pipeline.
+
+### What this does not say
+
+It does not say the policy is useless. Nothing here has run it. The curves say it learned
+something and stopped, and reading a curve is not the same as watching a body walk. Running
+the checkpoint is a separate job and it belongs before any further training, because it is the
+only measurement that answers what the training was for.
