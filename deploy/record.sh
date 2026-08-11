@@ -28,7 +28,7 @@ trap 'rm -rf "$WORK"' EXIT
 # --- from CITATION.cff -------------------------------------------------------
 TITLE="weft — a crowd that touches"
 AUTHOR="K. S. Ernest (iFire) Lee"
-URL="https://github.com/v-sekai-multiplayer-fabric/weft"
+URL="https://github.com/v-sekai-multiplayer-fabric/fabric-weft-plane"
 DESC="Single-writer actors, a level-triggered pool reconciler, and durable per-actor SQLite for the multiplayer fabric control plane. Every body is physically simulated in one contact solve; only muscles cross the wire."
 # CATSG terminology, which CITATION.cff adopts: Character, Avatar, Persona, Identity.
 KEYWORDS="actors,control-plane,character,avatar,persona,identity,CATSG,Khronos,weft"
