@@ -44,6 +44,11 @@ BLOCKED = {
                "`assets/ubisoft_bvh` inside an MIT repository is still CC BY-NC-ND.",
     "bandai": "Bandai Namco Research motion datasets 1 and 2, CC BY-NC 4.0. Only the Blender "
               "visualisation utility beside them is MIT.",
+    "sam": "Meta SAM-3D-Body, under the custom SAM License. It carries no non-commercial "
+           "clause, so it is not blocked for that. It is blocked because the licence is "
+           "bespoke and not OSI approved, and it adds trade control and ITAR terms, a "
+           "patent grant that terminates on litigation, and an obligation to indemnify "
+           "Meta. Those travel with anything built on it.",
 }
 
 # Allowed, with what makes the provenance checkable.
@@ -64,12 +69,44 @@ ALLOWED = {
                      "conditions generation, so its terms reach the output.",
     "hf-cache": "Hugging Face download cache. Holds copies of the above and nothing whose "
                 "terms are not already recorded here.",
+    "gem-x": "NVIDIA GEM-X, Apache-2.0. A TOOL and not a corpus: it turns video we hold "
+             "rights to into 77-joint SOMA motion, so nothing about it is a source of "
+             "motion by itself. It is kept and it is usable. What it cannot do quietly is "
+             "launder its dependency: its model takes video features from SAM-3D-Body as a "
+             "required input, so motion it produces carries the SAM License terms, and that "
+             "needs reading before any of it trains a policy weft ships. `sam` stays "
+             "blocked so the features and checkpoints cannot become training data by "
+             "accident.",
     "quaternius": "Quaternius Universal Animation Library, CC0 1.0. Public domain, so there "
                   "is nothing to inherit and nothing to attribute. 120+ animations at 30 fps "
                   "on a retargetable humanoid rig, with root motion on all locomotion. Its "
                   "rig is described as compatible with other rigs including Mixamo, which is "
                   "a naming convention and not a source: the animations are original.",
 }
+
+
+# A video is admissible only when TWO independent things say so. The licence field that the
+# search filter reads is one, and the uploader's own description is the other. Either alone
+# is a single self-assertion by someone who may not hold the rights, and a mismarked tag is
+# worse than no tag because it looks like consent. Requiring both does not make the uploader
+# right, but it makes a careless tag much less likely to be the only evidence.
+#
+# The performer is a separate question from the recording. A licence on the video is granted
+# by whoever uploaded it, and the people in it did not sign it. Extracting joint angles is
+# not a likeness, but that is reasoning and not settled ground, so the check records what was
+# relied on rather than pretending the question was answered.
+VIDEO_SIGNALS = ("license_field", "description")
+
+
+def video_admissible(signals):
+    """`signals` is what was actually observed, e.g. {"license_field": "cc-by", ...}."""
+    seen = [k for k in VIDEO_SIGNALS if str(signals.get(k, "")).lower().replace(" ", "")
+            in ("ccby", "cc-by", "creativecommons", "cc-by-4.0", "ccby4.0")]
+    if len(seen) < len(VIDEO_SIGNALS):
+        missing = [k for k in VIDEO_SIGNALS if k not in seen]
+        return ("error", "CC-BY asserted by %s but not by %s; both are required"
+                % (seen or ["nothing"], missing))
+    return ("ok", {"signals": seen, "performer_rights": "not established by the video licence"})
 
 
 def classify(path):

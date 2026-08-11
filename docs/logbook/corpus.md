@@ -314,3 +314,61 @@ and the rule matches on a path and cannot ask.
 This is a tooling decision and not a legal opinion. The distinction between a functional
 naming interface and the licensed work is the ordinary one and the industry relies on it, but
 nothing here has been through a lawyer, and it should be before it carries weight in a release.
+
+## How much is missing, and who it is of
+
+A target of "enough data" is a guess unless something fixes the scale. The O3DE corpus fixes
+it: it covers walking and turning well enough that a motion matching demo works on it, and
+covers everything else badly. Its **weakest well-covered** behaviour is turning, seven clips
+totalling 450 s. That is a measured floor for what one behaviour costs.
+
+| behaviour | have | missing to 450 s |
+| --- | ---: | ---: |
+| getting up | 10 s | 440 s |
+| sitting | 12 s | 438 s |
+| standing still | 71 s | 380 s |
+| being pushed | 74 s | 376 s |
+| strafing | 154 s | 297 s |
+| | | **1932 s, 32 minutes** |
+
+"Standing still" counts only 40 per cent of the measured idle frames, because `TurnOnSpot1`
+is 60 per cent of them and it is turning in place, not standing.
+
+Generating it is 193 clips of 10 s, about 8 minutes of diffusion on the 4090. Usable motion
+goes from 0.48 h to 1.01 h. Acquisition was never the answer: every corpus searched for was
+non-commercial, and the thing that was missing costs a quarter of an hour of compute.
+
+### Thirty-two minutes of whom
+
+A corpus generated at one default body is 32 minutes of one morphology. Gait is not scale
+invariant. Step length and cadence follow leg length, and the torque a hip needs follows
+mass, so a controller trained on one body learns balance tuned to those proportions. A venue
+is not one body.
+
+Anny carries conditional distributions over height, weight, muscle, and proportions, with a
+morphological age mapping, so a body can be sampled from a stated population instead of
+defaulted to. The axes that matter here are anthropometric rather than appearance: limb
+length, mass distribution, age, and mobility.
+
+Most of that variation belongs in training, as randomisation over the body, and costs no
+extra motion. Gait does not, so the clips are **stratified and not multiplied**: five strata
+sampled across the distribution at 386 s each, still 32 minutes. Multiplying instead would
+cost 161 minutes and buy far less, because the same clip retargeted onto five bodies is one
+gait wearing five sizes.
+
+The population sampled from has to be written down with the corpus. A distribution nobody
+states is a default nobody chose, and the default here is whatever body the generator emits.
+
+## A video needs two independent signals
+
+For video, the licence field the search filter reads and the uploader's own description must
+**both** assert CC-BY. Either alone is one self-assertion by someone who may not hold the
+rights, and a mismarked tag is worse than no tag because it looks like consent. Requiring
+both does not make an uploader right. It makes a careless tag much less likely to be the
+only evidence.
+
+The performer is a separate question from the recording. Whoever uploaded a video granted the
+licence, and the people in it did not sign it. Extracting joint angles is not a likeness, but
+that is reasoning rather than settled ground, so `video_admissible` returns what was relied
+on and states that performer rights are not established by the video licence, instead of
+returning a bare yes.

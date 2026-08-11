@@ -6,7 +6,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from corpus import admissible, classify, filter_corpus, roots, ROOT, BLOCKED, ALLOWED
+from corpus import (admissible, classify, filter_corpus, roots, ROOT, BLOCKED, ALLOWED,
+                    video_admissible)
 
 
 def test_mixamo_is_refused():
@@ -94,12 +95,41 @@ def test_a_rig_naming_scheme_is_not_a_source():
         assert admissible(p)[0] == "error", "%s claims a source and was admitted" % bad
 
 
+def test_a_tool_is_kept_but_its_dependency_is_not_training_data():
+    """GEM-X is a tool and stays. SAM-3D-Body is blocked so its features and checkpoints
+    cannot drift into the training set. Motion GEM-X writes still inherits SAM's terms,
+    which is a judgement for a person and not something a path check can decide."""
+    assert admissible("/opt/weft-motion/gem-x/outputs/clip.npz")[0] == "ok"
+    for p in ("/opt/weft-motion/sam-3d-body/checkpoints/sam3d_body.ckpt",
+              "/data/sam3d/features.npz"):
+        assert admissible(p)[0] == "error", "%s was admitted" % p
+
+
 def test_the_soma_path_stays_clean():
     """SOMA exists so there is a body model that is not SMPL. It must not be caught by it."""
     for p in ("/opt/weft-motion/kimodo-generated/idle_stand.usda",
               "protomotions/data/pretrained_models/motion_tracker/soma-bones/last.ckpt"):
         assert admissible(p)[0] != "error" or "unknown provenance" in admissible(p)[1], why_failed(p)
     assert admissible("/opt/weft-motion/anny/src/anny/data/soma/soma_rig.pt")[0] == "ok"
+
+
+def test_a_video_needs_both_signals():
+    """One self-assertion is not provenance. The licence field and the description must agree."""
+    assert video_admissible({"license_field": "cc-by", "description": "CC BY"})[0] == "ok"
+    for one_sided in ({"license_field": "cc-by"},
+                      {"description": "cc-by"},
+                      {"license_field": "standard youtube", "description": "cc-by"},
+                      {}):
+        tag, why = video_admissible(one_sided)
+        assert tag == "error", "%r was admitted on one signal" % one_sided
+        assert "both are required" in why
+
+
+def test_a_video_licence_does_not_speak_for_the_performer():
+    """Even when both signals agree, the people in the shot did not sign it. The result says so."""
+    tag, val = video_admissible({"license_field": "cc-by", "description": "cc-by"})
+    assert tag == "ok"
+    assert "performer" in " ".join(val)
 
 
 def test_unknown_provenance_is_refused():
