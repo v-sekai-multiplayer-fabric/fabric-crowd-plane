@@ -32,6 +32,18 @@ BLOCKED = {
     "humenv": "Meta HumEnv and Meta Motivo, CC BY-NC 4.0. The body is SMPL-derived and the "
               "motions are AMASS, so the non-commercial term is inherited and Meta could not "
               "have granted otherwise. Closest match to our topology and still unusable.",
+    "cmu": "CMU Graphics Lab motion capture. Its terms permit inclusion in a commercial "
+           "product but forbid reselling the data directly, even in converted form. A "
+           "shipped policy carries the corpus in its weights, and whether that is the data "
+           "in converted form is not a question to answer optimistically. Blocked.",
+    "lafan": "Ubisoft La Forge Animation dataset, CC BY-NC-ND 4.0. NoDerivatives is stricter "
+             "than the SMPL clause: a retarget is a derivative. Most of the motion matching "
+             "ecosystem is built on it under an MIT badge that covers only the code, "
+             "including orangeduck/Motion-Matching and bevy_motion_matching.",
+    "ubisoft": "Same corpus as lafan, under the name it is usually shipped as. "
+               "`assets/ubisoft_bvh` inside an MIT repository is still CC BY-NC-ND.",
+    "bandai": "Bandai Namco Research motion datasets 1 and 2, CC BY-NC 4.0. Only the Blender "
+              "visualisation utility beside them is MIT.",
 }
 
 # Allowed, with what makes the provenance checkable.

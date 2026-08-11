@@ -57,6 +57,17 @@ def test_the_smpl_family_is_refused():
         assert tag == "error", "%s was admitted" % p
 
 
+def test_the_motion_matching_datasets_are_refused():
+    """An MIT repository is not an MIT corpus. These all ship someone else's mocap."""
+    for p in ("/data/lafan1/walk1_subject2.bvh",
+              "Motion-Matching/resources/database.bin".replace("Motion-Matching", "lafan1_derived"),
+              "bevy_motion_matching/assets/ubisoft_bvh/walk1_subject1.bvh",
+              "/data/bandai-namco-research-motiondataset-1/walk.bvh",
+              "/data/cmu/subjects/01/01_01.amc"):
+        tag, why = admissible(p)
+        assert tag == "error", "%s was admitted" % p
+
+
 def test_the_soma_path_stays_clean():
     """SOMA exists so there is a body model that is not SMPL. It must not be caught by it."""
     for p in ("/opt/weft-motion/kimodo-generated/idle_stand.usda",

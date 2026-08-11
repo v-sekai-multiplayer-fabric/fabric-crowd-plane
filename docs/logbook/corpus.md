@@ -193,3 +193,50 @@ The test also refuses any undeclared directory in the corpus root. It fired imme
 `kimodo-src`, `hf-cache`, and `text-encoders`, which were directories added without saying
 where they came from. The Llama weights that condition generation are now recorded too,
 because they reach the output as surely as a clip does.
+
+## Searching for more sources like O3DE, and why there are almost none
+
+O3DE was found by accident and looked like one of many. An exhaustive sweep of the motion
+matching ecosystem says it is close to unique, and the reason is worth writing down because
+the next search will look promising in exactly the same misleading way.
+
+**The repository licence is not the corpus licence.** Every search sorted by licence returns
+MIT and Apache repositories that ship somebody else's mocap:
+
+| repository | code | the data inside |
+| --- | --- | --- |
+| `orangeduck/Motion-Matching`, 900 stars | MIT | LAFAN1, CC BY-NC-ND |
+| `voxell-tech/bevy_motion_matching` | MIT and Apache | ships `assets/ubisoft_bvh`, so LAFAN1 |
+| `JLPM22/MotionMatching`, 586 stars | MIT | not stated anywhere |
+| `BandaiNamcoResearchInc/...Motiondataset` | MIT, for the Blender viewer only | CC BY-NC 4.0 |
+| `ubisoft/ubisoft-laforge-animation-dataset` | MIT, for the code | CC BY-NC-ND 4.0 |
+
+Daniel Holden states it plainly in his own README: the data "is licensed under Creative
+Commons Attribution-NonCommercial-NoDerivatives 4.0 International Public License (unlike the
+code, which is licensed under MIT)". NoDerivatives is stricter than the SMPL clause, because
+a retarget is a derivative and so is a compiled database.
+
+So the field rests on one corpus. LAFAN1 is to motion matching what AMASS is to motion
+generation, and both are non-commercial.
+
+O3DE is the exception because it is not a dataset at all. It is an engine, and its clips are
+its own demo content, shipped under the engine's Apache-2.0 or MIT. **The pattern to search
+for is an engine or an open movie that had to clear its own assets, not a dataset.**
+
+### CMU is blocked
+
+The CMU Graphics Lab database looked like the second exception. Its terms permit including
+the data in a commercially sold product, which no other large corpus here allows. It also
+says the data may not be resold directly, "even in converted form", and a shipped policy
+carries its corpus in its weights. Whether that is the data in converted form is not a
+question to answer optimistically, so it is blocked.
+
+Two things about it are worth keeping even so. The same recordings carry different terms
+depending on where they are fetched: raw from `mocap.cs.cmu.edu` under CMU's own licence, or
+inside AMASS under Max Planck's. And the wording above came from secondary sources, because
+the CMU page did not return anything parseable.
+
+`bench/corpus.py` now blocks `cmu`, `lafan`, `ubisoft`, and `bandai` alongside the SMPL
+family, each with its reason, and `test_corpus.py` asserts each is refused under the name it
+actually arrives as. `assets/ubisoft_bvh` inside an MIT repository is the case that matters:
+nothing about the path says LAFAN1, and nothing about the repository says non-commercial.
